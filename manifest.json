@@ -1,5 +1,10 @@
 {
    "action": {
+      "default_icon": {
+         "16": "icon.png",
+         "48": "icon.png",
+         "128": "icon.png"
+      },
       "default_popup": "popup.html"
    },
    "background": {
@@ -7,8 +12,8 @@
    },
    "content_scripts": [ {
       "css": [ "/css/sweetalert.css", "popup.css" ],
-      "js": [ "utility.js", "content.js", "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
-      "matches": [ "https://www.usvisascheduling.com/en-US/*", "https://atlasauth.b2clogin.com/*" ]
+      "js": [ "utility.js", "content.js", "sweetalert.js", "securityQuestions.js" ],
+      "matches": [ "https://atlasauth.b2clogin.com/*" ]
    }, {
       "css": [ "/css/sweetalert.css", "popup.css" ],
       "js": [ "utility.js", "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
@@ -18,15 +23,15 @@
    "externally_connectable": {
       "matches": [ "https://atlasauth.b2clogin.com/*" ]
    },
-   "host_permissions": [ "https://www.usvisascheduling.com/*", "https://2captcha.com/*", "https://atlasauth.b2clogin.com/*" ],
+   "host_permissions": [ "https://www.usvisascheduling.com/*", "https://2captcha.com/*", "https://atlasauth.b2clogin.com/*", "https://getslotnow.com/*", "https://www.getslotnow.com/*", "http://localhost:8080/*" ],
    "icons": {
-      "128": "icon128.png",
-      "16": "icon16.png",
-      "48": "icon48.png"
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
    },
    "incognito": "spanning",
    "manifest_version": 3,
    "name": "CGI US Visa Appointment Auto Rescheduler",
    "permissions": [ "storage", "downloads" ],
-   "version": "0.0.0"
+   "version": "1.0.0"
 }

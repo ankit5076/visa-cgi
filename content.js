@@ -34,10 +34,475 @@ async function typeLoginFieldValue(field, value) {
   await dispatchLoginFieldEvent(field, 'change');
   await dispatchLoginFieldEvent(field, 'blur');
 }
+let cgiAccountPickerPromise = null;
+let cgiAccountPickerShownForPage = false;
+
+function isAtlasAuthLoginPage() {
+  return window.location.hostname === 'atlasauth.b2clogin.com';
+}
+
+function getLoginFields() {
+  return {
+    usernameField: document.getElementById('signInName'),
+    passwordField: document.getElementById('password')
+  };
+}
+
+async function waitForLoginFields(timeoutMs = 10000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const { usernameField, passwordField } = getLoginFields();
+    if (usernameField && passwordField) {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
+async function waitForSwal(timeoutMs = 10000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (typeof Swal !== 'undefined') {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
+function fetchCgiVisaAccountsFromTracker() {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ action: 'fetchCgiVisaAccounts' }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!response || response.ok !== true) {
+        reject(new Error(response?.error || 'Unable to fetch CGI accounts'));
+        return;
+      }
+      resolve(Array.isArray(response.accounts) ? response.accounts : []);
+    });
+  });
+}
+
+function normalizeCgiAccount(account) {
+  return {
+    id: account?.id,
+    name: String(account?.name || '').trim(),
+    username: String(account?.username || '').trim(),
+    password: String(account?.password || ''),
+    question1: String(account?.question1 || '').trim(),
+    answer1: String(account?.answer1 || ''),
+    question2: String(account?.question2 || '').trim(),
+    answer2: String(account?.answer2 || ''),
+    question3: String(account?.question3 || '').trim(),
+    answer3: String(account?.answer3 || '')
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function buildCgiAccountChoiceValue(account, index) {
+  if (account.id !== undefined && account.id !== null && account.id !== '') {
+    return `id:${account.id}`;
+  }
+  return `account:${index}`;
+}
+
+function buildCgiAccountPickerHtml(accountChoices, selectedValue) {
+  const accountCountLabel = accountChoices.length === 1
+    ? '1 saved tracker account'
+    : `${accountChoices.length} saved tracker accounts`;
+  const shouldShowSearch = accountChoices.length > 3;
+  const cardsHtml = accountChoices.map(({ account, value }, index) => {
+    const questionCount = [
+      account.question1 && account.answer1,
+      account.question2 && account.answer2,
+      account.question3 && account.answer3
+    ].filter(Boolean).length;
+    const isSelected = value === selectedValue;
+    const displayName = account.name || account.username;
+    const trackerLabel = account.id ? `Tracker ID #${account.id}` : `Account ${index + 1}`;
+    const metaParts = account.name
+      ? [`Username: ${account.username}`, trackerLabel, `${questionCount}/3 security answers`]
+      : [trackerLabel, `${questionCount}/3 security answers`];
+    const metaLabel = metaParts.join(' | ');
+    return `
+      <button
+        type="button"
+        class="cgi-account-card${isSelected ? ' is-selected' : ''}"
+        data-cgi-account-value="${escapeHtml(value)}"
+        data-cgi-search="${escapeHtml(`${account.name || ''} ${account.username} ${account.id || ''}`.toLowerCase())}"
+        aria-pressed="${isSelected ? 'true' : 'false'}"
+      >
+        <span class="cgi-account-radio" aria-hidden="true"></span>
+        <span class="cgi-account-copy">
+          <span class="cgi-account-username">${escapeHtml(displayName)}</span>
+          <span class="cgi-account-meta">${escapeHtml(metaLabel)}</span>
+        </span>
+      </button>
+    `;
+  }).join('');
+
+  return `
+    <style>
+      .cgi-account-swal {
+        border-radius: 12px;
+      }
+      .cgi-account-swal .swal2-title {
+        font-size: 30px;
+        line-height: 1.15;
+        padding: 0 12px;
+      }
+      .cgi-account-swal .swal2-html-container {
+        margin: 14px 28px 0;
+        overflow: visible;
+      }
+      .cgi-account-picker {
+        color: #111827;
+        font-family: inherit;
+        text-align: left;
+      }
+      .cgi-account-summary {
+        align-items: center;
+        color: #4b5563;
+        display: flex;
+        font-size: 15px;
+        gap: 12px;
+        justify-content: space-between;
+        margin: 0 0 12px;
+      }
+      .cgi-account-count {
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 999px;
+        color: #3730a3;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 6px 10px;
+        white-space: nowrap;
+      }
+      .cgi-account-search {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-sizing: border-box;
+        color: #111827;
+        font: inherit;
+        height: 44px;
+        margin: 0 0 12px;
+        outline: none;
+        padding: 0 12px;
+        width: 100%;
+      }
+      .cgi-account-search:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+      }
+      .cgi-account-list {
+        display: grid;
+        gap: 8px;
+        max-height: 288px;
+        overflow-y: auto;
+        padding: 2px;
+      }
+      .cgi-account-card {
+        align-items: center;
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        color: #111827;
+        cursor: pointer;
+        display: grid;
+        font: inherit;
+        gap: 12px;
+        grid-template-columns: 20px minmax(0, 1fr);
+        min-height: 64px;
+        padding: 12px;
+        text-align: left;
+        transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+        width: 100%;
+      }
+      .cgi-account-card:hover,
+      .cgi-account-card:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        outline: none;
+      }
+      .cgi-account-card.is-selected {
+        background: #eff6ff;
+        border-color: #2563eb;
+      }
+      .cgi-account-radio {
+        align-items: center;
+        border: 2px solid #94a3b8;
+        border-radius: 999px;
+        display: flex;
+        height: 18px;
+        justify-content: center;
+        width: 18px;
+      }
+      .cgi-account-card.is-selected .cgi-account-radio {
+        border-color: #2563eb;
+      }
+      .cgi-account-card.is-selected .cgi-account-radio::after {
+        background: #2563eb;
+        border-radius: 999px;
+        content: "";
+        display: block;
+        height: 8px;
+        width: 8px;
+      }
+      .cgi-account-copy {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+      .cgi-account-username {
+        color: #111827;
+        display: block;
+        font-size: 17px;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+      .cgi-account-meta {
+        color: #64748b;
+        display: block;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+      .cgi-account-empty {
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        color: #64748b;
+        display: none;
+        font-size: 14px;
+        padding: 14px;
+        text-align: center;
+      }
+      @media (max-width: 520px) {
+        .cgi-account-swal .swal2-html-container {
+          margin-left: 14px;
+          margin-right: 14px;
+        }
+        .cgi-account-summary {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .cgi-account-card {
+          padding: 10px;
+        }
+        .cgi-account-username {
+          font-size: 15px;
+        }
+      }
+    </style>
+    <div class="cgi-account-picker">
+      <input type="hidden" data-cgi-selected-value value="${escapeHtml(selectedValue)}">
+      <div class="cgi-account-summary">
+        <span>Pick the login to load into this page.</span>
+        <span class="cgi-account-count">${escapeHtml(accountCountLabel)}</span>
+      </div>
+      ${shouldShowSearch ? '<input class="cgi-account-search" data-cgi-account-search type="search" placeholder="Search by name, username, or tracker ID" autocomplete="off">' : ''}
+      <div class="cgi-account-list" data-cgi-account-list>
+        ${cardsHtml}
+      </div>
+      <div class="cgi-account-empty" data-cgi-account-empty>No matching account found.</div>
+    </div>
+  `;
+}
+
+function bindCgiAccountPickerEvents(popup) {
+  const selectedInput = popup.querySelector('[data-cgi-selected-value]');
+  const cards = Array.from(popup.querySelectorAll('[data-cgi-account-value]'));
+  const searchInput = popup.querySelector('[data-cgi-account-search]');
+  const emptyState = popup.querySelector('[data-cgi-account-empty]');
+  const selectCard = (card) => {
+    if (!card || !selectedInput) {
+      return;
+    }
+    selectedInput.value = card.dataset.cgiAccountValue || '';
+    cards.forEach((accountCard) => {
+      const isSelected = accountCard === card;
+      accountCard.classList.toggle('is-selected', isSelected);
+      accountCard.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    });
+  };
+
+  cards.forEach((card) => {
+    card.addEventListener('click', () => selectCard(card));
+    card.addEventListener('dblclick', () => {
+      selectCard(card);
+      Swal.clickConfirm();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const searchValue = searchInput.value.trim().toLowerCase();
+      let visibleCount = 0;
+      cards.forEach((card) => {
+        const matches = !searchValue || (card.dataset.cgiSearch || '').includes(searchValue);
+        card.style.display = matches ? '' : 'none';
+        if (matches) {
+          visibleCount += 1;
+        }
+      });
+      if (emptyState) {
+        emptyState.style.display = visibleCount ? 'none' : 'block';
+      }
+    });
+  }
+}
+
+async function hydrateCgiAccount(account) {
+  const normalized = normalizeCgiAccount(account);
+  await chrome.storage.sync.set({
+    username: normalized.username,
+    password: normalized.password,
+    question1: normalized.question1,
+    answer1: normalized.answer1,
+    question2: normalized.question2,
+    answer2: normalized.answer2,
+    question3: normalized.question3,
+    answer3: normalized.answer3
+  });
+  await chrome.storage.local.set({
+    __cgiSelectedTrackerAccountId: normalized.id || null,
+    __cgiSelectedTrackerAccountName: normalized.name,
+    __cgiSelectedTrackerAccountUsername: normalized.username,
+    __cgiSelectedTrackerAccountAt: new Date().toISOString()
+  });
+  return normalized;
+}
+
+async function showCgiAccountPickerIfNeeded() {
+  if (!isAtlasAuthLoginPage() || cgiAccountPickerShownForPage) {
+    return null;
+  }
+  if (cgiAccountPickerPromise) {
+    return cgiAccountPickerPromise;
+  }
+  cgiAccountPickerPromise = (async () => {
+    const hasLoginFields = await waitForLoginFields();
+    if (!hasLoginFields) {
+      return null;
+    }
+    const swalReady = await waitForSwal();
+    if (!swalReady) {
+      return null;
+    }
+    cgiAccountPickerShownForPage = true;
+    const wasOnboardingInProgress = isOnboardingInProgress;
+    isOnboardingInProgress = true;
+    try {
+      Swal.fire({
+        title: 'Loading CGI accounts',
+        text: 'Fetching saved tracker accounts...',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => Swal.showLoading()
+      });
+      const accounts = (await fetchCgiVisaAccountsFromTracker()).map(normalizeCgiAccount)
+        .filter(account => account.username && account.password);
+      if (!accounts.length) {
+        await Swal.fire({
+          title: 'No CGI accounts',
+          text: 'Add CGI accounts in Tracker UI before selecting one here.',
+          icon: 'info',
+          confirmButtonText: 'OK'
+        });
+        return null;
+      }
+      const accountChoices = accounts.map((account, index) => ({
+        account,
+        value: buildCgiAccountChoiceValue(account, index)
+      }));
+      const accountByValue = new Map(accountChoices.map(({ account, value }) => [value, account]));
+      const previousSelection = await chrome.storage.local.get([
+        '__cgiSelectedTrackerAccountId',
+        '__cgiSelectedTrackerAccountName',
+        '__cgiSelectedTrackerAccountUsername'
+      ]);
+      const selectedChoice = accountChoices.find(({ account }) =>
+        previousSelection.__cgiSelectedTrackerAccountId &&
+        String(account.id) === String(previousSelection.__cgiSelectedTrackerAccountId)
+      ) || accountChoices.find(({ account }) =>
+        previousSelection.__cgiSelectedTrackerAccountUsername &&
+        account.username === previousSelection.__cgiSelectedTrackerAccountUsername
+      ) || accountChoices[0];
+      const selectedValue = selectedChoice.value;
+      const result = await Swal.fire({
+        title: 'Choose CGI account',
+        html: buildCgiAccountPickerHtml(accountChoices, selectedValue),
+        width: 560,
+        showCancelButton: true,
+        confirmButtonText: 'Load account',
+        cancelButtonText: 'Skip for now',
+        confirmButtonColor: '#2563eb',
+        cancelButtonColor: '#6b7280',
+        customClass: {
+          popup: 'cgi-account-swal'
+        },
+        focusConfirm: false,
+        allowOutsideClick: false,
+        didOpen: (popup) => {
+          bindCgiAccountPickerEvents(popup);
+        },
+        preConfirm: () => {
+          const selectedInput = Swal.getPopup().querySelector('[data-cgi-selected-value]');
+          const value = String(selectedInput?.value || '');
+          if (!value || !accountByValue.has(value)) {
+            Swal.showValidationMessage('Choose an account to load');
+            return false;
+          }
+          return value;
+        }
+      });
+      if (!result.isConfirmed) {
+        return null;
+      }
+      const selectedAccount = accountByValue.get(String(result.value));
+      const hydrated = await hydrateCgiAccount(selectedAccount);
+      await Swal.fire({
+        title: 'Account loaded',
+        text: `${hydrated.name || hydrated.username} is now saved in the extension.`,
+        icon: 'success',
+        timer: 1200,
+        showConfirmButton: false
+      });
+      return hydrated;
+    } catch (error) {
+      await Swal.fire({
+        title: 'Unable to load CGI accounts',
+        text: error.message || String(error),
+        icon: 'error',
+        confirmButtonText: 'OK'
+      });
+      return null;
+    } finally {
+      isOnboardingInProgress = wasOnboardingInProgress;
+      cgiAccountPickerPromise = null;
+    }
+  })();
+  return cgiAccountPickerPromise;
+}
 async function checkInitialActivationStatus() {
   try {
     const { __ap } = await chrome.storage.local.get(['__ap']);
     isAutomationActive = __ap || false;
+    await showCgiAccountPickerIfNeeded();
     if (isAutomationActive) {
       runOnboardingSequence();
     }

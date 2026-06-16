@@ -1,5 +1,128 @@
 importScripts('utility.js');
 
+const TRACKER_API_BASE_URL = 'https://getslotnow.com/administrator-api/api/us-visa';
+const TRACKER_AUTH_API_BASE_URL = 'https://getslotnow.com/administrator-api/api/auth';
+const TRACKER_AUTH_HEADER = 'X-Tracker-Admin-Session';
+const TRACKER_AUTH_CREDENTIALS = Object.freeze({
+  username: 'ankit5076',
+  password: 'Automate!5076',
+});
+const TRACKER_REQUEST_TIMEOUT_MS = 15000;
+
+let trackerAuthSessionToken = null;
+let trackerAuthLoginPromise = null;
+
+async function fetchWithTimeout(url, options = {}) {
+  const { timeoutMs = TRACKER_REQUEST_TIMEOUT_MS, signal: callerSignal, ...fetchOptions } = options;
+  let controller = null;
+  let timeoutId = null;
+  let signal = callerSignal;
+  if (timeoutMs && !signal) {
+    controller = new AbortController();
+    signal = controller.signal;
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  }
+  try {
+    return await fetch(url, { ...fetchOptions, signal });
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+function clearTrackerAuthSession() {
+  trackerAuthSessionToken = null;
+  trackerAuthLoginPromise = null;
+}
+
+async function loginTrackerAdmin() {
+  if (trackerAuthLoginPromise) {
+    return trackerAuthLoginPromise;
+  }
+  trackerAuthLoginPromise = fetchWithTimeout(`${TRACKER_AUTH_API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(TRACKER_AUTH_CREDENTIALS),
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw new Error(`Tracker auth API returned ${response.status}`);
+    }
+    const payload = await response.json();
+    const sessionToken = String(payload?.session_token || '').trim();
+    if (!sessionToken) {
+      throw new Error('Tracker auth API did not return a session token');
+    }
+    trackerAuthSessionToken = sessionToken;
+    return sessionToken;
+  }).finally(() => {
+    trackerAuthLoginPromise = null;
+  });
+  return trackerAuthLoginPromise;
+}
+
+async function getTrackerAuthSessionToken() {
+  if (trackerAuthSessionToken) {
+    return trackerAuthSessionToken;
+  }
+  return loginTrackerAdmin();
+}
+
+async function fetchTrackerWithAuth(path, options = {}, retryOnUnauthorized = true) {
+  const sessionToken = await getTrackerAuthSessionToken();
+  const response = await fetchWithTimeout(`${TRACKER_API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      [TRACKER_AUTH_HEADER]: sessionToken,
+    },
+  });
+  if (response.status !== 401 || !retryOnUnauthorized) {
+    return response;
+  }
+  clearTrackerAuthSession();
+  const retrySessionToken = await getTrackerAuthSessionToken();
+  return fetchWithTimeout(`${TRACKER_API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      [TRACKER_AUTH_HEADER]: retrySessionToken,
+    },
+  });
+}
+
+function normalizeCgiAccountForContent(account) {
+  return {
+    id: account?.id,
+    name: account?.name || '',
+    username: account?.username || '',
+    password: account?.password || '',
+    question1: account?.question1 || '',
+    answer1: account?.answer1 || '',
+    question2: account?.question2 || '',
+    answer2: account?.answer2 || '',
+    question3: account?.question3 || '',
+    answer3: account?.answer3 || '',
+    updated_at: account?.updated_at || account?.updatedAt || '',
+  };
+}
+
+async function fetchCgiVisaAccounts() {
+  const response = await fetchTrackerWithAuth('/cgi/accounts', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    throw new Error(`Tracker CGI accounts API returned ${response.status}`);
+  }
+  const accounts = await response.json();
+  if (!Array.isArray(accounts)) {
+    throw new Error('Tracker CGI accounts API returned an invalid response');
+  }
+  return accounts.map(normalizeCgiAccountForContent);
+}
+
 chrome.runtime.onConnect.addListener(function (port) {
   connectedPorts.push(port);
   port.onDisconnect.addListener(function () {
@@ -51,6 +174,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       sendResponse({ success: true });
     });
+    return true;
+  }
+  if (request.action === 'fetchCgiVisaAccounts') {
+    fetchCgiVisaAccounts()
+      .then(accounts => {
+        sendResponse({ ok: true, accounts });
+      })
+      .catch(error => {
+        sendResponse({ ok: false, error: error.message || String(error) });
+      });
     return true;
   }
   if (request.action === 'solveCaptcha') {

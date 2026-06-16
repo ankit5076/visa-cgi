@@ -315,7 +315,7 @@ async function resumePendingDateSelectionIfNeeded() {
 if (!document.querySelector("#extension-styles")) {
   const extensionStyles = document.createElement("style");
   extensionStyles.id = "extension-styles";
-  extensionStyles.textContent = "\n        .swal2-modal :is(h2, p){color: initial; margin: 0;line-height: 1.25;}\n        .swal2-modal p+p{margin-top: 1rem;}\n        #consulate_date_time,#asc_date_time{display:block!important;}\n        .swal2-select{width:auto!important;}\n        .swal2-timer-progress-bar{background:rgba(255,255,255,0.6)!important;}\n        .swal2-toast.swal2-show{background:rgba(0,0,0,0.75)!important;}\n    ";
+  extensionStyles.textContent = "\n        .swal2-modal :is(h2, p){color: initial; margin: 0;line-height: 1.25;}\n        .swal2-modal p+p{margin-top: 1rem;}\n        #consulate_date_time,#asc_date_time{display:block!important;}\n        .swal2-select{width:auto!important;}\n        .swal2-timer-progress-bar{background:rgba(255,255,255,0.6)!important;}\n        .swal2-toast.swal2-show{background:rgba(0,0,0,0.75)!important;}\n        .swal2-popup.gsn-scheduler-toast{background:transparent!important;box-shadow:none!important;padding:0!important;width:min(430px,calc(100vw - 24px))!important;}\n        .swal2-popup.gsn-scheduler-toast .swal2-html-container{margin:0!important;padding:0!important;overflow:visible!important;text-align:left!important;}\n        .swal2-popup.gsn-scheduler-toast .swal2-timer-progress-bar{height:3px!important;background:#03a87c!important;border-radius:999px;}\n        .gsn-toast-card{position:relative;overflow:hidden;border:1px solid rgba(3,168,124,.22);border-radius:10px;background:#fff;color:#17231f;box-shadow:0 18px 42px rgba(15,23,42,.18);font-family:\"Open Sans\",Arial,sans-serif;}\n        .gsn-toast-card::before{content:\"\";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#03a87c,#0f766e,#f59e0b);}\n        .gsn-toast-inner{padding:14px 16px 13px;}\n        .gsn-toast-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}\n        .gsn-toast-dot{width:9px;height:9px;border-radius:999px;background:#03a87c;box-shadow:0 0 0 5px rgba(3,168,124,.12);flex:0 0 auto;}\n        .gsn-toast-title{color:#0f2f29;font-size:16px;font-weight:800;line-height:1.2;letter-spacing:0;}\n        .gsn-toast-grid{display:grid;gap:7px;}\n        .gsn-toast-row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:start;}\n        .gsn-toast-label{color:#64748b;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;}\n        .gsn-toast-value{color:#15231f;font-size:13px;font-weight:700;line-height:1.28;overflow-wrap:anywhere;}\n        .gsn-toast-value.is-primary{color:#047857;}\n        .gsn-toast-status{margin-top:10px;padding:8px 10px;border:1px solid #fde68a;border-radius:7px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:800;line-height:1.25;}\n        .gsn-toast-countdown{margin-top:10px;padding:9px 10px;border:1px solid #b7ead9;border-radius:8px;background:#f0fdfa;}\n        .gsn-toast-countdown-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;}\n        .gsn-toast-countdown-label-wrap{display:flex;align-items:center;gap:7px;min-width:0;}\n        .gsn-toast-countdown-label{color:#0f766e;font-size:11px;font-weight:900;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap;}\n        .gsn-toast-loader{position:relative;width:14px;height:14px;border-radius:999px;background:conic-gradient(from 0deg,#03a87c,#0f766e,#f59e0b,#03a87c);animation:gsnToastSpin .85s linear infinite;flex:0 0 auto;}\n        .gsn-toast-loader::after{content:\"\";position:absolute;inset:3px;border-radius:999px;background:#f0fdfa;}\n        .gsn-toast-countdown-time{color:#064e3b;font-size:13px;font-weight:950;font-variant-numeric:tabular-nums;white-space:nowrap;}\n        .gsn-toast-countdown-track{height:6px;overflow:hidden;border-radius:999px;background:#d1fae5;}\n        .gsn-toast-countdown-bar{display:block;width:100%;height:100%;border-radius:999px;background:linear-gradient(90deg,#03a87c,#0f766e,#f59e0b);transform-origin:left center;transition:transform .35s linear;}\n        .gsn-toast-footer{display:flex;justify-content:space-between;gap:10px;margin-top:10px;padding-top:9px;border-top:1px solid #e5e7eb;color:#64748b;font-size:11px;font-weight:700;line-height:1.35;}\n        .gsn-toast-footer strong{color:#0f766e;font-weight:800;}\n        @keyframes gsnToastSpin{to{transform:rotate(360deg)}}\n        @media(max-width:520px){.gsn-toast-row{grid-template-columns:1fr;gap:2px}.gsn-toast-footer{display:block}.gsn-toast-title{font-size:15px}.gsn-toast-countdown-head{align-items:flex-start;flex-direction:column;gap:5px}}\n        @media(prefers-reduced-motion:reduce){.gsn-toast-loader{animation:none}.gsn-toast-countdown-bar{transition:none}}\n    ";
   document.head.appendChild(extensionStyles);
 }
 async function loadSchedulerActiveState() {
@@ -468,9 +468,14 @@ async function runSchedulerPageAutomation() {
       return;
     }
     cleanupSchedulerState();
-    if (window.location.href.includes("usvisascheduling.com/") && !window.location.href.includes("/en-US/") && !window.location.href.includes("/signin-aad-b2c_1")) {
+    const isAccountAuthPage = window.location.pathname.toLowerCase().startsWith("/account/");
+    if (isAccountAuthPage) {
+      return;
+    }
+    const localeUrlPattern = /\/[a-z]{2}-[A-Z]{2}\//;
+    if (window.location.href.includes("usvisascheduling.com/") && localeUrlPattern.test(window.location.href) && !window.location.href.includes("/en-US/") && !window.location.href.includes("/signin-aad-b2c_1")) {
       redirectionHandled = true;
-      const I = window.location.href.replace(/\/[a-z]{2}-[A-Z]{2}\//, "/en-US/");
+      const I = window.location.href.replace(localeUrlPattern, "/en-US/");
       window.location.replace(I);
       return;
     }
@@ -1215,11 +1220,26 @@ async function checkConsularScheduleDays(a, b) {
           month: "long",
           day: "numeric"
         });
-        await showSchedulerToast("\n          <span style=\"color: white\">Checking for available dates</span><br>\n          <span style=\"color: lightgreen;\">Location: " + (a.cityName || "Unknown") + "</span><br>\n          <span style=\"color: lightgreen;\">Earliest availability: " + a8 + "</span><br>\n          <span style=\"color: yellow;\">Preferred range: " + formatDateRange(d.startDate, d.endDate) + "</span><br>\n          <span style=\"color: white\">No dates found within preferred range</span><br>\n          <span style=\"color: yellow;\">Checked @ " + new Date().toLocaleString() + "</span>\n        ");
+        await showDateAvailabilityToast({
+          title: "Checking for available dates",
+          locationLabel: "Location",
+          location: a.cityName || "Unknown",
+          earliestAvailability: a8,
+          preferredRange: formatDateRange(d.startDate, d.endDate),
+          status: "No dates found within preferred range",
+          checkedAt: formatSchedulerCheckedAt()
+        });
       }
     } else {
       await logSchedulerMessage(" - Location: " + (a.cityName || "Unknown") + " - No available dates found");
-      await showSchedulerToast("\n        <span style=\"color: white\">No available dates found</span><br>\n        <span style=\"color: lightgreen;\">Location: " + (a.cityName || "Unknown") + "</span><br>\n        <span style=\"color: yellow;\">Preferred range: " + formatDateRange(d.startDate, d.endDate) + "</span><br>\n        <span style=\"color: yellow;\">Checked @ " + new Date().toLocaleString() + "</span>\n      ");
+      await showDateAvailabilityToast({
+        title: "Checking for available dates",
+        locationLabel: "Location",
+        location: a.cityName || "Unknown",
+        preferredRange: formatDateRange(d.startDate, d.endDate),
+        status: "No available dates found",
+        checkedAt: formatSchedulerCheckedAt()
+      });
     }
   } catch (ag) {
     await logSchedulerMessage(" - Location: " + (a.cityName || "Unknown") + " - Error: " + ag.message);
@@ -1250,7 +1270,7 @@ async function checkConsularScheduleDays(a, b) {
         allowEscapeKey: false
       });
     } else {
-      await showSchedulerToast("\n                <span style=\"color: red\">Error checking dates: " + ag.message + "</span><br>\n                <span style=\"color: lightgreen;\">Location: " + (a.cityName || "Unknown") + "</span><br>\n                <span style=\"color: yellow;\">Preferred range: " + formatDateRange(ah.startDate, ah.endDate) + "</span><br>\n                <span style=\"color: yellow;\">Checked @ " + new Date().toLocaleString() + "</span>\n            ");
+      await showSchedulerToast("\n                <span style=\"color: red\">Error checking dates: " + ag.message + "</span><br>\n                <span style=\"color: lightgreen;\">Location: " + (a.cityName || "Unknown") + "</span><br>\n                <span style=\"color: yellow;\">Preferred range: " + formatDateRange(ah.startDate, ah.endDate) + "</span><br>\n                <span style=\"color: yellow;\">Checked @ " + formatSchedulerCheckedAt() + "</span>\n            ");
     }
     setTimeout(() => {
       window.location.href = "https://www.usvisascheduling.com/en-US/";
@@ -1337,20 +1357,150 @@ async function getCurrentAppointment() {
     return null;
   }
 }
-const showSchedulerToast = async a => {
-  const b = await getPollingFrequencyMs();
+function escapeSchedulerToastHtml(a) {
+  return String(a ?? "").replace(/[&<>"']/g, b => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  })[b]);
+}
+function formatSchedulerCheckedAt(a = new Date()) {
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).format(a);
+  } catch (b) {
+    return a.toLocaleString();
+  }
+}
+function formatSchedulerCountdown(a) {
+  const b = Math.max(0, Math.ceil(Number(a || 0) / 1000));
+  if (b >= 3600) {
+    const c = Math.floor(b / 3600);
+    const d = Math.floor(b % 3600 / 60);
+    return d ? c + "h " + d + "m" : c + "h";
+  }
+  if (b >= 60) {
+    const e = Math.floor(b / 60);
+    const f = b % 60;
+    return f ? e + "m " + f + "s" : e + "m";
+  }
+  return b + "s";
+}
+function attachSchedulerCountdown(a, b) {
+  const c = a?.querySelector("[data-gsn-countdown]");
+  if (!c || !b || b <= 0) {
+    return null;
+  }
+  const d = c.querySelector("[data-gsn-countdown-text]");
+  const e = c.querySelector("[data-gsn-countdown-bar]");
+  const f = Date.now();
+  const g = () => {
+    const h = Math.max(0, b - (Date.now() - f));
+    const i = formatSchedulerCountdown(h);
+    if (d) {
+      d.textContent = i;
+    }
+    if (e) {
+      e.style.transform = "scaleX(" + Math.max(0, Math.min(1, h / b)) + ")";
+    }
+    c.setAttribute("aria-label", "Next call in " + i);
+  };
+  g();
+  return setInterval(g, 1000);
+}
+function buildDateAvailabilityToast(a) {
+  const b = [];
+  b.push({
+    label: a.locationLabel || "Location",
+    value: a.location || "Unknown",
+    primary: true
+  });
+  if (a.earliestAvailability) {
+    b.push({
+      label: "Earliest",
+      value: a.earliestAvailability,
+      primary: true
+    });
+  }
+  b.push({
+    label: "Preferred",
+    value: a.preferredRange || "-"
+  });
+  const c = b.map(d => "\n      <div class=\"gsn-toast-row\">\n        <span class=\"gsn-toast-label\">" + escapeSchedulerToastHtml(d.label) + "</span>\n        <span class=\"gsn-toast-value" + (d.primary ? " is-primary" : "") + "\">" + escapeSchedulerToastHtml(d.value) + "</span>\n      </div>\n    ").join("");
+  const d = Number(a.nextCallMs || 0);
+  const e = d > 0 ? "\n        <div class=\"gsn-toast-countdown\" data-gsn-countdown aria-live=\"polite\" aria-label=\"Next call in " + escapeSchedulerToastHtml(formatSchedulerCountdown(d)) + "\">\n          <div class=\"gsn-toast-countdown-head\">\n            <span class=\"gsn-toast-countdown-label-wrap\"><span class=\"gsn-toast-loader\" aria-hidden=\"true\"></span><span class=\"gsn-toast-countdown-label\">Next call</span></span>\n            <strong class=\"gsn-toast-countdown-time\" data-gsn-countdown-text>" + escapeSchedulerToastHtml(formatSchedulerCountdown(d)) + "</strong>\n          </div>\n          <div class=\"gsn-toast-countdown-track\" aria-hidden=\"true\"><span class=\"gsn-toast-countdown-bar\" data-gsn-countdown-bar></span></div>\n        </div>\n      " : "";
+  return "\n    <div class=\"gsn-toast-card\">\n      <div class=\"gsn-toast-inner\">\n        <div class=\"gsn-toast-header\">\n          <span class=\"gsn-toast-dot\" aria-hidden=\"true\"></span>\n          <span class=\"gsn-toast-title\">" + escapeSchedulerToastHtml(a.title || "Checking for available dates") + "</span>\n        </div>\n        <div class=\"gsn-toast-grid\">" + c + "</div>\n        <div class=\"gsn-toast-status\">" + escapeSchedulerToastHtml(a.status || "No dates found within preferred range") + "</div>" + e + "\n        <div class=\"gsn-toast-footer\">\n          <span>Checked <strong>" + escapeSchedulerToastHtml(a.checkedAt || formatSchedulerCheckedAt()) + "</strong></span>\n          " + (a.currentAppointment ? "<span>Current <strong>" + escapeSchedulerToastHtml(a.currentAppointment) + "</strong></span>" : "") + "\n        </div>\n      </div>\n    </div>\n  ";
+}
+function normalizeSchedulerToastOptions(a) {
+  if (typeof a === "number") {
+    return {
+      timerMs: a
+    };
+  }
+  return a || {};
+}
+const showSchedulerToast = async (a, options = {}) => {
+  options = normalizeSchedulerToastOptions(options);
+  const b = Number(options.timerMs || 0) > 0 ? Number(options.timerMs) : await getPollingFrequencyMs();
   const c = await getCurrentAppointment();
   let d = a;
-  if (c && c.dateString) {
+  if (c && c.dateString && options.themed && !options.skipCurrentAppointment) {
+    d += "<div class=\"gsn-toast-footer\"><span>Current <strong>" + escapeSchedulerToastHtml(c.dateString) + "</strong></span></div>";
+  } else if (c && c.dateString && !options.skipCurrentAppointment) {
     d += "<br><span style=\"color: #FFD700;\">Current Appointment: " + c.dateString + "</span>";
   }
+  let e = null;
   Swal.fire({
     toast: true,
     position: "bottom-start",
     timer: b,
     showConfirmButton: false,
     timerProgressBar: true,
-    html: d
+    customClass: options.customClass ? {
+      popup: options.customClass
+    } : undefined,
+    html: d,
+    didOpen: f => {
+      if (options.countdownMs) {
+        e = attachSchedulerCountdown(f, Number(options.countdownMs));
+      }
+      if (typeof options.didOpen === "function") {
+        options.didOpen(f);
+      }
+    },
+    willClose: () => {
+      if (e) {
+        clearInterval(e);
+      }
+      if (typeof options.willClose === "function") {
+        options.willClose();
+      }
+    }
+  });
+};
+const showDateAvailabilityToast = async a => {
+  const b = await getCurrentAppointment();
+  const c = await getPollingFrequencyMs();
+  await showSchedulerToast(buildDateAvailabilityToast({
+    ...a,
+    currentAppointment: b?.dateString || "",
+    nextCallMs: c
+  }), {
+    timerMs: c,
+    countdownMs: c,
+    customClass: "gsn-scheduler-toast",
+    skipCurrentAppointment: true,
+    themed: true
   });
 };
 function formatDateRange(a, b) {
@@ -2325,11 +2475,26 @@ async function checkOfcScheduleDays(a, b) {
           month: "long",
           day: "numeric"
         });
-        await showSchedulerToast("\n          <span style=\"color: white\">Checking OFC dates</span><br>\n          <span style=\"color: lightgreen;\">City: " + a.cityName + "</span><br>\n          <span style=\"color: lightgreen;\">Earliest availability: " + ae + "</span><br>\n          <span style=\"color: yellow;\">Preferred range: " + formatDateRange(c.startDate, c.endDate) + "</span><br>\n          <span style=\"color: white\">No dates found within preferred range</span><br>\n          <span style=\"color: yellow;\">Checked @ " + new Date().toLocaleString() + "</span>\n        ");
+        await showDateAvailabilityToast({
+          title: "Checking OFC dates",
+          locationLabel: "City",
+          location: a.cityName || "Unknown",
+          earliestAvailability: ae,
+          preferredRange: formatDateRange(c.startDate, c.endDate),
+          status: "No dates found within preferred range",
+          checkedAt: formatSchedulerCheckedAt()
+        });
       }
     } else {
       await logSchedulerMessage("OFC  - City: " + a.cityName + " - No available dates found");
-      await showSchedulerToast("\n                <span style=\"color: white\">No OFC dates available</span><br>\n                <span style=\"color: lightgreen;\">City: " + a.cityName + "</span><br>\n                <span style=\"color: yellow;\">Preferred range: " + formatDateRange(c.startDate, c.endDate) + "</span><br>\n                <span style=\"color: yellow;\">Checked @ " + new Date().toLocaleString() + "</span>\n            ");
+      await showDateAvailabilityToast({
+        title: "Checking OFC dates",
+        locationLabel: "City",
+        location: a.cityName || "Unknown",
+        preferredRange: formatDateRange(c.startDate, c.endDate),
+        status: "No OFC dates available",
+        checkedAt: formatSchedulerCheckedAt()
+      });
     }
   } catch (am) {
     await logSchedulerMessage("OFC  - City: " + (a.cityName || "Unknown") + " - Error: " + am.message);
@@ -2355,7 +2520,7 @@ async function checkOfcScheduleDays(a, b) {
         an = formatDateRange(storageData.startDate, storageData.endDate);
       }
     } catch (ao) {}
-    await showSchedulerToast("\n            <span style=\"color: red\">Error checking OFC dates: " + am.message + "</span><br>\n            <span style=\"color: lightgreen;\">City: " + (a.cityName || "Unknown") + "</span><br>\n            <span style=\"color: yellow;\">Preferred range: " + an + "</span><br>\n            <span style=\"color: yellow;\">Checked @ " + new Date().toLocaleString() + "</span>\n        ");
+    await showSchedulerToast("\n            <span style=\"color: red\">Error checking OFC dates: " + am.message + "</span><br>\n            <span style=\"color: lightgreen;\">City: " + (a.cityName || "Unknown") + "</span><br>\n            <span style=\"color: yellow;\">Preferred range: " + an + "</span><br>\n            <span style=\"color: yellow;\">Checked @ " + formatSchedulerCheckedAt() + "</span>\n        ");
     setTimeout(() => {
       window.location.href = "https://www.usvisascheduling.com/en-US/";
     }, 3000);
@@ -2364,31 +2529,51 @@ async function checkOfcScheduleDays(a, b) {
 async function loadUserSchedulingSettings() {
   try {
     const {
-      profiles = {},
-      currentProfile = "default",
+      username = "",
+      password = "",
+      apiKey = "",
+      question1 = "",
+      answer1 = "",
+      question2 = "",
+      answer2 = "",
+      question3 = "",
+      answer3 = "",
       selectedOfcCities = {},
       selectedConsularCities = {},
       allCities = {},
       startDate: a,
       endDate: b
-    } = await chrome.storage.sync.get(["profiles", "currentProfile", "selectedOfcCities", "selectedConsularCities", "allCities", "startDate", "endDate"]);
-    const c = profiles[currentProfile] || {};
+    } = await chrome.storage.sync.get([
+      "username",
+      "password",
+      "apiKey",
+      "question1",
+      "answer1",
+      "question2",
+      "answer2",
+      "question3",
+      "answer3",
+      "selectedOfcCities",
+      "selectedConsularCities",
+      "allCities",
+      "startDate",
+      "endDate"
+    ]);
     const d = {
-      username: c.username || "",
-      password: c.password || "",
-      apiKey: c.apiKey || "",
-      question1: c.question1 || "",
-      answer1: c.answer1 || "",
-      question2: c.question2 || "",
-      answer2: c.answer2 || "",
-      question3: c.question3 || "",
-      answer3: c.answer3 || "",
+      username: username || "",
+      password: password || "",
+      apiKey: apiKey || "",
+      question1: question1 || "",
+      answer1: answer1 || "",
+      question2: question2 || "",
+      answer2: answer2 || "",
+      question3: question3 || "",
+      answer3: answer3 || "",
       startDate: a || "",
       endDate: b || "",
       selectedOfcCities: selectedOfcCities || {},
       selectedConsularCities: selectedConsularCities || {},
       allCities: allCities || {},
-      currentProfile: currentProfile,
       hasRequiredData() {
         const e = Object.keys(this.selectedOfcCities).length > 0;
         const f = Object.keys(this.selectedConsularCities).length > 0;
