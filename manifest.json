@@ -7,11 +7,11 @@
    },
    "content_scripts": [ {
       "css": [ "/css/sweetalert.css", "popup.css" ],
-      "js": [ "content.js", "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
+      "js": [ "utility.js", "content.js", "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
       "matches": [ "https://www.usvisascheduling.com/en-US/*", "https://atlasauth.b2clogin.com/*" ]
    }, {
       "css": [ "/css/sweetalert.css", "popup.css" ],
-      "js": [ "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
+      "js": [ "utility.js", "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
       "matches": [ "*://*.usvisascheduling.com/*" ]
    } ],
    "description": "Reschedule US Visa to an earlier date for India, Pakistan, UAE, Bangladesh, Turkey, Algeria etc.",

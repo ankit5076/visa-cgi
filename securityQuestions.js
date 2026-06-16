@@ -1,10 +1,16 @@
 let securityQuestionsHandled = false;
 let isSecurityQuestionsActive = false; 
-function initializeSecurityQuestions() {
+async function clickSecurityElement(element) {
+  await VisaCgiUtility.clickWithJitter(element, VisaCgiUtility.JITTER_RANGES.DOM_EVENT);
+}
+async function dispatchSecurityFieldEvent(field, eventName) {
+  await VisaCgiUtility.dispatchEventWithJitter(field, eventName, VisaCgiUtility.JITTER_RANGES.DOM_EVENT);
+}
+async function initializeSecurityQuestions() {
           if (window.location.href.includes('/Account/Login/ExternalAuthenticationFailed')) {
             const signInButton = document.querySelector('a.btn.btn-primary[title="Sign in"]');
             if (signInButton) {
-                signInButton.click();
+                await clickSecurityElement(signInButton);
                 return;
             } else {
                 const maxWaitTime = 10000; 
@@ -12,10 +18,10 @@ function initializeSecurityQuestions() {
                 while (Date.now() - startTime < maxWaitTime) {
                     const button = document.querySelector('a.btn.btn-primary[title="Sign in"]');
                     if (button) {
-                        button.click();
+                        await clickSecurityElement(button);
                         return;
                     }
-                    new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
             return;
@@ -121,14 +127,14 @@ function initializeSecurityQuestions() {
         }
         if (answer) {
           input.value = answer;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
+          await dispatchSecurityFieldEvent(input, 'input');
         } else {
         }
       }
-      setTimeout(() => {
+      setTimeout(async () => {
         const submitBtn = document.querySelector('button#continue');
         if (submitBtn) {
-          submitBtn.click();
+          await clickSecurityElement(submitBtn);
         } else {
           console.warn('Submit button not found');
         }
@@ -149,7 +155,7 @@ securityQuestionsPort.onMessage.addListener(async function (response) {
     let $active = response.data.$active;
     isSecurityQuestionsActive = $active;
     if ($active) {
-      initializeSecurityQuestions();
+      await initializeSecurityQuestions();
     } else {
       securityQuestionsHandled = true; 
     }
@@ -158,7 +164,7 @@ securityQuestionsPort.onMessage.addListener(async function (response) {
     isSecurityQuestionsActive = status;
     if (status) {
       securityQuestionsHandled = false; 
-      initializeSecurityQuestions();
+      await initializeSecurityQuestions();
     } else {
       securityQuestionsHandled = true; 
     }

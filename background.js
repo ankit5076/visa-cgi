@@ -1,3 +1,5 @@
+importScripts('utility.js');
+
 chrome.runtime.onConnect.addListener(function (port) {
   connectedPorts.push(port);
   port.onDisconnect.addListener(function () {
@@ -114,7 +116,7 @@ async function solveCaptcha(imageBase64, apiKey) {
     if (!apiKey) {
       return Promise.reject('Missing 2captcha API key');
     }
-    const submitRes = await fetch(`https://2captcha.com/in.php?key=${apiKey}&method=base64&body=${encodeURIComponent(imageBase64)}`);
+    const submitRes = await VisaCgiUtility.fetchWithJitter(`https://2captcha.com/in.php?key=${apiKey}&method=base64&body=${encodeURIComponent(imageBase64)}`);
     const submitText = await submitRes.text();
     if (!submitText.startsWith('OK|')) {
       return Promise.reject(`2captcha submission failed: ${submitText}`);
@@ -126,7 +128,7 @@ async function solveCaptcha(imageBase64, apiKey) {
       const interval = setInterval(async () => {
         try {
           attempts++;
-          const res = await fetch(`https://2captcha.com/res.php?key=${apiKey}&action=get&id=${captchaId}`);
+          const res = await VisaCgiUtility.fetchWithJitter(`https://2captcha.com/res.php?key=${apiKey}&action=get&id=${captchaId}`);
           const text = await res.text();
           if (text.includes('OK|')) {
             clearInterval(interval);

@@ -1,6 +1,39 @@
 let isCaptchaSolved = false;
 let isAutomationActive = false;
 let isOnboardingInProgress = false;
+async function dispatchLoginFieldEvent(field, eventName) {
+  await VisaCgiUtility.dispatchEventWithJitter(field, eventName, VisaCgiUtility.JITTER_RANGES.DOM_EVENT);
+}
+async function clickLoginElement(element) {
+  await VisaCgiUtility.clickWithJitter(element, VisaCgiUtility.JITTER_RANGES.DOM_EVENT);
+}
+function hasUnsolvedLoginCaptcha() {
+  const captchaImage = document.getElementById('captchaImage');
+  const captchaInput = document.getElementById('extension_atlasCaptchaResponse');
+  return Boolean(captchaImage && (!captchaInput || !captchaInput.value));
+}
+async function clickLoginContinueButton() {
+  if (hasUnsolvedLoginCaptcha()) {
+    return;
+  }
+  const continueButton = document.getElementById('continue');
+  if (continueButton && !continueButton.disabled) {
+    await clickLoginElement(continueButton);
+  }
+}
+async function typeLoginFieldValue(field, value) {
+  const text = value || '';
+  field.value = '';
+  await VisaCgiUtility.focusWithJitter(field, VisaCgiUtility.JITTER_RANGES.DOM_EVENT);
+  await dispatchLoginFieldEvent(field, 'focus');
+  for (const char of text) {
+    await VisaCgiUtility.waitForJitter(VisaCgiUtility.JITTER_RANGES.CHARACTER);
+    field.value += char;
+    await dispatchLoginFieldEvent(field, 'input');
+  }
+  await dispatchLoginFieldEvent(field, 'change');
+  await dispatchLoginFieldEvent(field, 'blur');
+}
 async function checkInitialActivationStatus() {
   try {
     const { __ap } = await chrome.storage.local.get(['__ap']);
@@ -195,27 +228,12 @@ async function fillForm() {
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
-        usernameField.value = '';
-        passwordField.value = '';
-        const inputEvent = new Event('input', { bubbles: true, cancelable: true });
-        const changeEvent = new Event('change', { bubbles: true, cancelable: true });
-        const focusEvent = new Event('focus', { bubbles: true, cancelable: true });
-        const blurEvent = new Event('blur', { bubbles: true, cancelable: true });
-        usernameField.focus();
-        usernameField.dispatchEvent(focusEvent);
-        usernameField.value = username || '';
-        usernameField.dispatchEvent(inputEvent);
-        usernameField.dispatchEvent(changeEvent);
-        usernameField.dispatchEvent(blurEvent);
-        passwordField.focus();
-        passwordField.dispatchEvent(focusEvent);
-        passwordField.value = password || '';
-        passwordField.dispatchEvent(inputEvent);
-        passwordField.dispatchEvent(changeEvent);
-        passwordField.dispatchEvent(blurEvent);
+        await typeLoginFieldValue(usernameField, username);
+        await typeLoginFieldValue(passwordField, password);
         const usernameSet = usernameField.value === (username || '');
         const passwordSet = passwordField.value === (password || '');
         if (usernameSet && passwordSet) {
+          await clickLoginContinueButton();
           return;
         } else {
           if (attempt < maxAttempts) {
@@ -248,7 +266,7 @@ async function fillForm() {
         const startErrorMonitoring = () => {
           let errorCheckAttempts = 0;
           const maxErrorCheckAttempts = 30;
-          const monitorForError = () => {
+          const monitorForError = async () => {
             if (!isAutomationActive || isOnboardingInProgress) {
               return;
             }
@@ -261,7 +279,7 @@ async function fillForm() {
               }
               const refreshButton = document.getElementById('captchaImageRefreshImage');
               if (refreshButton) {
-                refreshButton.click();
+                await clickLoginElement(refreshButton);
                 isCaptchaSolved = false;
                 setTimeout(() => {
                   checkForCaptcha();
@@ -373,8 +391,11 @@ const checkForCaptcha = async () => {
           const captchaInput = document.getElementById('extension_atlasCaptchaResponse');
           if (captchaInput) {
             captchaInput.value = solution;
-            setTimeout(() => {
-              document.getElementById('continue')?.click();
+            setTimeout(async () => {
+              const continueButton = document.getElementById('continue');
+              if (continueButton) {
+                await clickLoginElement(continueButton);
+              }
             }, 1000);
           } else {
             isCaptchaSolved = false;
