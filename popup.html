@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="popup.css">
+    <script src="popup.js"></script>
+    <style>
+        body {
+            width: 400px;
+            padding: 10px;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .city-button {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .city-button.selected {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #45a049;
+        }
+
+        .city-button:hover {
+            background-color: #f0f0f0;
+        }
+
+        .city-button.selected:hover {
+            background-color: #45a049;
+        }
+
+        .cities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .city-section {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .city-section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .city-section-header h3 {
+            margin: 0;
+            margin-right: 10px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .appointment-type-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ofc-badge {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .consular-badge {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        h3 {
+            margin-top: 12px;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .toggles-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .toggle-section {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            background-color: #f9f9f9;
+        }
+
+        .date-range-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .date-input-group {
+            flex: 1;
+        }
+
+        .question-answer-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .question-select {
+            flex: 2;
+        }
+
+        .answer-input {
+            flex: 1;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="date"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        input[type="date"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            border-color: #03a87c;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(3, 168, 124, 0.1);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #444;
+        }
+
+        .buttons-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 12px 0 10px 0;
+        }
+
+        .a.buy,
+        .button.contact {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            border: none;
+            display: inline-block;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .a.buy {
+            background-color: #03a87c;
+            color: #fff;
+        }
+
+        .a.buy:hover {
+            background-color: #038f6c;
+        }
+
+        .button.contact {
+            background-color: #222;
+            color: #fff;
+        }
+
+        .button.contact:hover {
+            background-color: #111;
+        }
+
+        #profile-section {
+            margin-bottom: 10px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+
+        #profile-section button {
+            padding: 6px 8px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #profile-section button:hover {
+            background-color: #e0e0e0;
+        }
+
+        #notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(3, 168, 124, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #notification.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <section class="popup-container">
+        <div id="notification">Saved</div>
+        <header>
+            <img src="images/usa-canada.png" alt="US Visa Logo" class="logo">
+            <h1>CGI Auto Rescheduler<br><span id="version"></span></h1>
+        </header>
+        <div class="credits-left">
+            <h3 id="credits">0</h3>
+            <p>&nbsp;Free Credits</p>
+        </div>
+        <div class="toggles-container">
+            <div class="toggle-section">
+                <label class="switch">
+                    <input type="checkbox" id="activate">
+                    <span class="slider round"></span>
+                </label>
+                <label for="activate" style="margin: 0 0 0 8px; display: inline-block;">Activate the script</label>
+            </div>
+            <div class="toggle-section">
+                <label class="switch">
+                    <input type="checkbox" id="autobook">
+                    <span class="slider round"></span>
+                </label>
+                <label for="autobook" style="margin: 0 0 0 8px; display: inline-block;">Enable Autobook</label>
+            </div>
+        </div>
+        <h3>Login Credentials</h3>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <input type="text" id="apiKey" placeholder="2Captcha API Key">
+        <h3>Preferred Date Range</h3>
+        <div class="date-range-container">
+            <div class="date-input-group">
+                <label for="startDate">Start Date:</label>
+                <input type="date" id="startDate">
+            </div>
+            <div class="date-input-group">
+                <label for="endDate">End Date:</label>
+                <input type="date" id="endDate">
+            </div>
+        </div>
+        <h3>Check Frequency</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+                <label for="frequencyType">Frequency Type:</label>
+                <select id="frequencyType">
+                    <option selected value="seconds">Seconds</option>
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label for="frequencyValue">Value:</label>
+                <input type="number" id="frequencyValue" min="1" max="3600" value="30">
+            </div>
+        </div>
+        <h3>Security Questions</h3>
+        <div class="question-answer-container">
+            <select id="question1" class="security-question question-select">
+                <option value="">Select Question 1</option>
+                <option value="spouse">Where did you meet your spouse?</option>
+                <option value="street">What is the name of the road/street you grew up on?</option>
+                <option value="mother">What is your mother's maiden name?</option>
+                <option value="car">What was your first car?</option>
+                <option value="job">In what city or town was your first job?</option>
+                <option value="food">What is your favorite food?</option>
+                <option value="school">What high school did you attend?</option>
+                <option value="pet">What was the name of your first/current/favorite pet?</option>
+                <option value="hero">Who was your childhood hero?</option>
+                <option value="company">What was the first company that you worked for?</option>
+                <option value="born">What is the name of the town/city where you were born?</option>
+                <option value="college">What is the name of a college you applied to but didnt attend?</option>
+                <option value="sibling">What is your sibling's middle name?</option>
+            </select>
+            <input type="text" id="answer1" placeholder="Answer 1" class="answer-input">
+        </div>
+        <div class="question-answer-container">
+            <select id="question2" class="security-question question-select">
+                <option value="">Select Question 2</option>
+                <option value="spouse">Where did you meet your spouse?</option>
+                <option value="street">What is the name of the road/street you grew up on?</option>
+                <option value="mother">What is your mother's maiden name?</option>
+                <option value="car">What was your first car?</option>
+                <option value="job">In what city or town was your first job?</option>
+                <option value="food">What is your favorite food?</option>
+                <option value="school">What high school did you attend?</option>
+                <option value="pet">What was the name of your first/current/favorite pet?</option>
+                <option value="hero">Who was your childhood hero?</option>
+                <option value="company">What was the first company that you worked for?</option>
+                <option value="born">What is the name of the town/city where you were born?</option>
+                <option value="college">What is the name of a college you applied to but didnt attend?</option>
+                <option value="sibling">What is your sibling's middle name?</option>
+            </select>
+            <input type="text" id="answer2" placeholder="Answer 2" class="answer-input">
+        </div>
+        <div class="question-answer-container">
+            <select id="question3" class="security-question question-select">
+                <option value="">Select Question 3</option>
+                <option value="spouse">Where did you meet your spouse?</option>
+                <option value="street">What is the name of the road/street you grew up on?</option>
+                <option value="mother">What is your mother's maiden name?</option>
+                <option value="car">What was your first car?</option>
+                <option value="job">In what city or town was your first job?</option>
+                <option value="food">What is your favorite food?</option>
+                <option value="school">What high school did you attend?</option>
+                <option value="pet">What was the name of your first/current/favorite pet?</option>
+                <option value="hero">Who was your childhood hero?</option>
+                <option value="company">What was the first company that you worked for?</option>
+                <option value="born">What is the name of the town/city where you were born?</option>
+                <option value="college">What is the name of a college you applied to but didnt attend?</option>
+                <option value="sibling">What is your sibling's middle name?</option>
+            </select>
+            <input type="text" id="answer3" placeholder="Answer 3" class="answer-input">
+        </div>
+        <div id="profile-section">
+            <h3 style="margin-top: 0;">Profile Management</h3>
+            <select id="profile-select" style="margin-bottom: 8px;">
+                <option value="">Select a profile...</option>
+            </select>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button id="save-profile" style="flex: 1;">Save Current Profile</button>
+                <button id="delete-profile" style="flex: 1;">Delete Profile</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="download-profiles" style="flex: 1;">Download Profiles</button>
+                <button id="upload-profiles" style="flex: 1;">Upload Profiles</button>
+            </div>
+            <input type="file" id="profile-upload" accept=".json" style="display: none;">
+            <div id="profile-status" style="margin-top: 6px; font-size: 12px; color: #666; text-align: center;"></div>
+            <h3>Notification Settings</h3>
+            <input type="text" id="pushoverUserKey" placeholder="Pushover User Key (Optional)">
+            <div style="font-size: 11px; color: #666; margin-top: 5px; margin-bottom: 15px;">
+                Get booking confirmation push alerts on your phone! <a href="https://pushover.net" target="_blank">Get
+                    Pushover User Key</a>
+            </div>
+        </div>
+        <div class="city-section" id="ofc-city-section" style="display: none;">
+            <div class="city-section-header">
+                <h3>OFC Cities</h3>
+                <span class="appointment-type-badge ofc-badge">OFC Appointment</span>
+            </div>
+            <div id="ofc-cities-grid" class="cities-grid"></div>
+        </div>
+        <div class="city-section" id="consular-city-section" style="display: none;">
+            <div class="city-section-header">
+                <h3>Consular Cities</h3>
+                <span class="appointment-type-badge consular-badge">Consular Appointment</span>
+            </div>
+            <div id="consular-cities-grid" class="cities-grid"></div>
+        </div>
+        <div class="buttons-container">
+            <a class="a buy" id="save">Save All</a>
+            <button id="downloadLogs" class="button contact">Download Logs</button>
+        </div>
+        <div class="buttons-container">
+            <a class="a buy" href="https://buy.stripe.com/6oUbJ00Do1cp5JIaqAdwc08" target="_blank">Buy Credits</a>
+            <button id="contact_us" form="none" class="button contact">Contact Us</button>
+        </div>
+        <div id="user-email-display" style="display: none; text-align: center; margin-top: 10px; font-size: 11px;">
+            Provide this email at the time of payment: <span id="user-email-text"></span>
+        </div>
+    </section>
+</body>
+
+</html>

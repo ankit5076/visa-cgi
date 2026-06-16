@@ -1,0 +1,366 @@
+:root {
+    --color-brand: #03a87c; /* Green accent color */
+    --color-brand-darker: #038f6c;
+    --color-green: #03a87c;
+    --color-red: #f44336;
+    --color-grey-lighter: #f9f9f9;
+    --color-grey-light: #eee;
+    --color-grey: #aaa;
+    --color-black: #222;
+    --color-white: #fff;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap');
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.popup-container {
+    width: 380px;
+    height: auto;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: var(--color-white);
+    color: var(--color-black);
+}
+
+h1 {
+    font-size: 17px;
+    text-align: center;
+    font-weight: normal;
+    color: var(--color-brand);
+    margin-left: 15px;
+    margin-bottom: 0;
+}
+
+h3 {
+    margin-top: 12px;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 5px;
+}
+
+.logo {
+    height: 60px;
+    vertical-align: middle;
+    margin-left: 15px;
+}
+
+.dashboard {
+    background-color: var(--color-grey-lighter);
+    padding: 12px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.credits-left {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    margin: 5px 0;
+}
+
+.credits-left h3 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--color-brand);
+}
+
+.credits-left p {
+    margin: 0;
+}
+
+/* Profile section styling */
+#profile-section {
+    margin-bottom: 10px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: var(--color-grey-lighter);
+}
+
+#profile-section button {
+    padding: 6px 8px;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#profile-section button:hover {
+    background-color: #e0e0e0;
+}
+
+/* City section styling */
+#city-section {
+    margin-bottom: 10px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: var(--color-white);
+}
+
+/* Toggle styles */
+.toggles-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 10px 0 12px 0;
+}
+
+.toggle-section {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: var(--color-grey-lighter);
+    transition: all 0.3s ease;
+}
+
+.toggle-section:hover {
+    background-color: var(--color-grey-light);
+}
+
+.toggle-section label {
+    margin: 0 0 0 10px;
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 25px;
+    margin: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 25px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 2.5px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--color-brand);
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--color-brand);
+}
+
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+.slider.round {
+    border-radius: 34px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* Date range styles */
+.date-range-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.date-input-group {
+    flex: 1;
+}
+
+.date-input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #444;
+}
+
+/* Security question/answer styles */
+.question-answer-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.question-select {
+    flex: 2;
+}
+
+.answer-input {
+    flex: 1;
+}
+
+/* Form styling */
+input[type="text"], 
+input[type="password"],
+input[type="date"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    font-family: 'Open Sans', sans-serif;
+}
+
+input[type="text"]:focus, 
+input[type="password"]:focus,
+input[type="date"]:focus,
+input[type="number"]:focus,
+select:focus {
+    border-color: var(--color-brand);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(3, 168, 124, 0.1);
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #444;
+}
+
+/* Button styling */
+.buttons-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 12px 0 10px 0;
+}
+
+.a, .button {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    border: none;
+    display: inline-block;
+    min-width: 0;
+    margin: 0;
+}
+
+.a.buy {
+    background-color: var(--color-brand);
+    color: var(--color-white);
+    border: none;
+}
+
+.a.buy:hover {
+    background-color: var(--color-brand-darker);
+}
+
+.button.contact {
+    background-color: var(--color-black);
+    color: var(--color-white);
+}
+
+.button.contact:hover {
+    background-color: #111;
+}
+
+footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-grey);
+    margin-top: 10px;
+}
+
+.twitter-handle {
+    color: var(--color-green);
+}
+
+.twitter-handle img {
+    height: 24px;
+    vertical-align: middle;
+}
+
+.manage-subscription {
+    display: none;
+}
+
+.form-group {
+    margin-bottom: 10px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: 'Open Sans', sans-serif;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.bold {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
