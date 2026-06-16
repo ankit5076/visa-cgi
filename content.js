@@ -8,7 +8,6 @@ async function checkInitialActivationStatus() {
     if (isAutomationActive) {
       runOnboardingSequence();
     }
-    updateCreditsDisplay();
   } catch (error) {
   }
 }
@@ -141,7 +140,7 @@ async function runOnboardingSequence() {
       }
       await Swal.fire({
         title: "Terms & Conditions",
-        html: "<p>By using this extension, you acknowledge and agree that the developer is not responsible for any rescheduling that may occur due to glitches, site changes, or other unforeseen circumstances. Users are solely responsible for any actions taken by the extension, and should be aware of this risk before using it.</p><p>This extension will not auto reschedule your appointment unless the auto book feature is enabled or you manually click on the notification when an earlier date is found. We do not collect your password, ensuring your privacy and security. We may collect email for future communications. </p><p>We accept payments via authorized payment provider (Stripe) only. All funds paid for the use of this extension are non-refundable.</p>",
+        html: "<p>By using this extension, you acknowledge and agree that the developer is not responsible for any rescheduling that may occur due to glitches, site changes, or other unforeseen circumstances. Users are solely responsible for any actions taken by the extension, and should be aware of this risk before using it.</p><p>This extension will not auto reschedule your appointment unless the auto book feature is enabled or you manually click on the notification when an earlier date is found.</p>",
         icon: "warning",
         confirmButtonText: "Yes, I Give My Consent",
         allowEscapeKey: false,
@@ -398,25 +397,3 @@ const checkForCaptcha = async () => {
   }
 };
 checkInitialActivationStatus();
-async function updateCreditsDisplay() {
-  try {
-    const items = await chrome.storage.local.get(['user_credits', 'is_pro_user']);
-    const isPro = items["is_pro_user"];
-    const creditsElement = document.getElementById("credits");
-    const creditsTextElement = document.querySelector(".credits-left p");
-    if (creditsElement) {
-      if (isPro) {
-        creditsElement.innerText = "Unlimited";
-        if (creditsTextElement) {
-          creditsTextElement.innerText = "Credits";
-        }
-      } else {
-        creditsElement.innerText = items["user_credits"] || "--";
-        if (creditsTextElement) {
-          creditsTextElement.innerText = "Credits Left";
-        }
-      }
-    }
-  } catch (error) {
-  }
-}

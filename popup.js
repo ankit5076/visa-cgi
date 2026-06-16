@@ -4,49 +4,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const manifest = chrome.runtime.getManifest();
     versionElement.textContent = `v${manifest.version}`;
   }
-  function refreshCredits() {
-    chrome.storage.local.get(['user_credits', 'is_pro_user'], function(items) {
-      const creditsElement = document.getElementById('credits');
-      const creditsTextElement = document.querySelector('.credits-left p');
-      if (creditsElement) {
-        const isPro = items.is_pro_user;
-        if (isPro) {
-          creditsElement.textContent = 'Unlimited';
-          if (creditsTextElement) {
-            creditsTextElement.textContent = 'Credits';
-          }
-        } else {
-          const userCredits = items.user_credits !== undefined ? items.user_credits : 0;
-          creditsElement.textContent = userCredits;
-          if (creditsTextElement) {
-            creditsTextElement.textContent = 'Free Credits';
-          }
-        }
-      }
-    });
-  }
-  refreshCredits();
-  function displayUserEmail() {
-    chrome.storage.local.get(['email'], function(items) {
-      const emailDisplay = document.getElementById('user-email-display');
-      const emailText = document.getElementById('user-email-text');
-      if (emailDisplay && emailText && items.email) {
-        emailText.textContent = items.email;
-        emailDisplay.style.display = 'block';
-      } else if (emailDisplay && !items.email) {
-        emailDisplay.style.display = 'none';
-      }
-    });
-  }
-  displayUserEmail();
-  chrome.storage.onChanged.addListener(function(changes, namespace) {
-    if (namespace === 'local' && (changes.user_credits || changes.is_pro_user)) {
-      refreshCredits();
-    }
-    if (namespace === 'local' && changes.email) {
-      displayUserEmail();
-    }
-  });
   chrome.storage.local.get(['__ap', '__ab'], function(items) {
     const activateToggle = document.getElementById('activate');
     const autobookToggle = document.getElementById('autobook');
@@ -196,9 +153,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       //window.close();
     });
   });
-  document.getElementById("contact_us").addEventListener("click", function() {
-    chrome.tabs.create({ url: "https://www.alertmeasap.com/contact" });
-});
   await loadProfileList();
   document.getElementById('save-profile').addEventListener('click', saveCurrentProfile);
   document.getElementById('profile-select').addEventListener('change', (e) => {

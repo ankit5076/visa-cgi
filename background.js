@@ -22,9 +22,6 @@ const connectedPorts = [];
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === 'install') {
     chrome.tabs.create({
-      url: "https://www.alertmeasap.com"
-    });
-    chrome.tabs.create({
       url: "https://www.usvisascheduling.com/en-US/"
     });
   }

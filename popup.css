@@ -14,10 +14,8 @@
     box-sizing: border-box;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap');
-
 body {
-    font-family: 'Open Sans', sans-serif;
+    font-family: Arial, sans-serif;
     font-size: 14px;
     color: #333;
     line-height: 1.4;
@@ -78,24 +76,6 @@ header {
     padding: 12px;
     border-radius: 5px;
     text-align: center;
-}
-
-.credits-left {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 16px;
-    margin: 5px 0;
-}
-
-.credits-left h3 {
-    margin: 0;
-    font-size: 20px;
-    color: var(--color-brand);
-}
-
-.credits-left p {
-    margin: 0;
 }
 
 /* Profile section styling */

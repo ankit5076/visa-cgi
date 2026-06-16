@@ -7,11 +7,11 @@
    },
    "content_scripts": [ {
       "css": [ "/css/sweetalert.css", "popup.css" ],
-      "js": [ "content.js", "sweetalert.js", "securityQuestions.js", "cook.js", "schedulingPage.js" ],
+      "js": [ "content.js", "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
       "matches": [ "https://www.usvisascheduling.com/en-US/*", "https://atlasauth.b2clogin.com/*" ]
    }, {
       "css": [ "/css/sweetalert.css", "popup.css" ],
-      "js": [ "sweetalert.js", "securityQuestions.js", "cook.js", "schedulingPage.js" ],
+      "js": [ "sweetalert.js", "securityQuestions.js", "schedulingPage.js" ],
       "matches": [ "*://*.usvisascheduling.com/*" ]
    } ],
    "description": "Reschedule US Visa to an earlier date for India, Pakistan, UAE, Bangladesh, Turkey, Algeria etc.",
@@ -25,10 +25,8 @@
       "48": "icon48.png"
    },
    "incognito": "spanning",
-   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtBlt9Pz2YsihhbGHPQsgGMEJTPMWV3F5zuqZMJNly8P7yTEMHwTbThZ5+/ABoN1DbwQRSx+mVXEH4Kwn2QWQofg5N08cBDAagWURtwfntLV88TsYOaKPeIjbjypXrOc96OWomhi9tzLVT+19UwW6jcmiQVwOr41Ki/pRS//hRxbCStFGULFWvUKaGu0LKwvP0uczk4POCJKXLYZfLDrID+PEBaYAwifIZncUE6U6qLUYPa3DrBJ/2OLIt3SXM/hfulIKGAKOcY3OFe+AjanqE0hne4fcuRttHTdv8efaJIfiAvSoon+/6GVS0vCIHDOJe75g0GMty6Ktfc+Vo51B8wIDAQAB",
    "manifest_version": 3,
    "name": "CGI US Visa Appointment Auto Rescheduler",
    "permissions": [ "storage", "downloads" ],
-   "update_url": "https://clients2.google.com/service/update2/crx",
    "version": "0.0.0"
 }

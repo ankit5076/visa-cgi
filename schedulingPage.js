@@ -72,97 +72,6 @@ function a0h(a) {
     const b = a0g[a];
     return b ? b['location'] : 'undefined';
 }
-let a0i = null, a0j = 0x0;
-const a0k = 0x3;
-async function a0l(a = ![]) {
-    a0i && (clearTimeout(a0i), a0i = null);
-    try {
-        if (!a && a0j >= a0k)
-            return;
-        if (!a) {
-            const j = window['location']['pathname'], k = window['location']['pathname'] + window['location']['search'], l = [
-                    '/schedule/',
-                    '/ofc-schedule',
-                    '/ofc-schedule/?reschedule=true',
-                    '/schedule/?reschedule=true'
-                ], m = l['some'](n => {
-                    return n['includes']('?') ? k['includes'](n) : j['includes'](n);
-                });
-            if (!m)
-                return;
-        }
-        const b = [...document['querySelectorAll']('script')]['map'](n => n['innerText'] || n['textContent'])['join']('\x0a')['match'](/setAuthenticatedUserContext\(['"]([^'"]+)['"]\)/)?.[0x1], c = await chrome['storage']['local']['get']([
-                'user_credits',
-                'is_pro_user',
-                'email'
-            ]), d = await a0a3();
-        if (c['user_credits'] === undefined && !a) {
-            console['warn']('sync\x20-\x20No\x20credits\x20found\x20in\x20storage,\x20aborting\x20sync');
-            return;
-        }
-        const {
-                user_credits: e,
-                syncInterval: syncInterval = 0x1,
-                is_pro_user: is_pro_user = ![],
-                email: email = ''
-            } = c, f = b || email;
-        if (!f) {
-            console['warn']('sync\x20-\x20No\x20email\x20found\x20for\x20credit\x20sync');
-            return;
-        }
-        if (is_pro_user && !a) {
-            try {
-                await JWTAuth['init']();
-                if (!JWTAuth['isTokenValid']()) {
-                    const n = 'https://ustraveldocscgiservertelegramalert-h3f2ercuf9d5f8gm.canadacentral-01.azurewebsites.net', o = await JWTAuth['refreshAccessToken'](n);
-                    if (o) {
-                    } else
-                        console['warn']('sync\x20-\x20JWT\x20token\x20refresh\x20failed\x20for\x20pro\x20user,\x20will\x20attempt\x20re-auth\x20when\x20needed');
-                } else {
-                }
-            } catch (p) {
-            }
-            a0m(d);
-            return;
-        }
-        if (e === undefined && !a) {
-            console['warn']('sync\x20-\x20No\x20valid\x20credits\x20value\x20to\x20sync');
-            return;
-        }
-        const g = {
-                'email': f,
-                'credits': e
-            }, h = await JWTAuth['makeAuthenticatedRequest']('https://ustraveldocscgiservertelegramalert-h3f2ercuf9d5f8gm.canadacentral-01.azurewebsites.net/api/set-credits', {
-                'method': 'POST',
-                'body': JSON['stringify'](g)
-            });
-        if (!h['ok'])
-            throw new Error('Failed\x20to\x20sync:\x20' + await h['text']());
-        const i = await h['json']();
-        await chrome['storage']['local']['set']({ 'user_credits': i['__cr'] }), a0j = 0x0;
-    } catch (q) {
-        a0j++;
-        if (a0j >= a0k)
-            return;
-    } finally {
-        const r = await a0a3();
-        a0m(r);
-    }
-}
-function a0m(a) {
-    a0i && clearTimeout(a0i), a0i = setTimeout(() => {
-        a0l()['catch'](b => {
-        });
-    }, Math['max'](a, 0xea60));
-}
-(function a0au() {
-    if (window['syncInitialized'])
-        return;
-    window['syncInitialized'] = !![], a0a3()['then'](a => {
-        a0m(a);
-    })['catch'](a => {
-    });
-}());
 let a0n = ![], a0o = ![], a0p = ![], a0q = 0x0, a0r = ![], a0s = null, a0t = null, a0u = ![], a0v = ![], a0w = 0x0, a0x = ![], a0y = ![], a0z = null, a0A = null;
 const a0B = 0x2d * 0x3c * 0x3e8;
 let a0C = new Set(), a0D = new Set(), a0E = new Set();
@@ -406,31 +315,6 @@ async function a0Q() {
                         return;
                     }
                     g === 'UNKNOWN' && (console['warn']('⚠️\x20Sending\x20notifications\x20with\x20UNKNOWN\x20city\x20-\x20consider\x20improving\x20city\x20detection'), await a0a9('Warning:\x20Sending\x20notifications\x20with\x20UNKNOWN\x20city'));
-                    try {
-                        let y = null;
-                        if (b?.['consularAppointmentDetails']?.[0x0]?.['appointmentDate']) {
-                            const C = b['consularAppointmentDetails'][0x0]['appointmentDate'], D = C['match'](/(\d{1,2}:\d{2}:\d{2}\s*[AP]M)/i);
-                            D && (y = D[0x1]);
-                        }
-                        let z = null;
-                        b?.['primaryApplicantDetails']?.['visaClass'] && (z = b['primaryApplicantDetails']['visaClass']);
-                        const A = {
-                                'email': h,
-                                'date': i,
-                                'city': g,
-                                'timeSlot': y,
-                                'visaClass': z
-                            }, B = await fetch('https://ustraveldocscgiservertelegramalert-h3f2ercuf9d5f8gm.canadacentral-01.azurewebsites.net/sendConfirmationToTelegram', {
-                                'method': 'POST',
-                                'headers': { 'Content-Type': 'application/json' },
-                                'body': JSON['stringify'](A)
-                            });
-                        if (B['ok']) {
-                            const E = await B['json']();
-                        } else {
-                        }
-                    } catch (F) {
-                    }
                     await a0an(d, b, h, g, i);
                 }
             } catch (G) {
@@ -460,32 +344,6 @@ async function a0Q() {
                 if (K)
                     await chrome['storage']['local']['set']({ 'email': K });
                 else {
-                }
-                const L = chrome['runtime']['getManifest']()['version'];
-                try {
-                    const M = await JWTAuth['authenticate']('https://ustraveldocscgiservertelegramalert-h3f2ercuf9d5f8gm.canadacentral-01.azurewebsites.net', K, L);
-                    if (!M)
-                        throw new Error('Authentication\x20failed');
-                    const N = {
-                            'ok': !![],
-                            'json': () => Promise['resolve'](M)
-                        }, O = M;
-                    O && O['__cr'] !== undefined && O['__isProUser'] !== undefined ? chrome['storage']['local']['set']({
-                        'user_credits': O['__cr'],
-                        'is_pro_user': O['__isProUser']
-                    }, function () {
-                    }) : console['warn']('Incomplete\x20or\x20missing\x20data\x20in\x20config\x20response:', O);
-                } catch (P) {
-                    await Swal['fire']({
-                        'title': 'Attention\x20please.',
-                        'html': P['message'],
-                        'allowEscapeKey': ![],
-                        'allowEnterKey': ![],
-                        'allowOutsideClick': ![],
-                        'icon': 'warning',
-                        'confirmButtonText': 'Ok'
-                    }), window['location']['href'] = window['location']['href']['replace'](/\/schedule.*/g, '/users/sign_out');
-                    return;
                 }
             } catch (Q) {
                 return;
@@ -938,39 +796,6 @@ async function a0a0(a, b) {
         }
         a0q = 0x0;
         async function m() {
-            const J = await new Promise(N => {
-                chrome['storage']['local']['get']([
-                    'user_credits',
-                    'is_pro_user'
-                ], function (O) {
-                    N({
-                        'credits': O['user_credits'] || 0x0,
-                        'isProUser': O['is_pro_user'] || ![]
-                    });
-                });
-            });
-            let K = J['credits'];
-            const L = J['isProUser'];
-            if ((!K || K <= 0x0) && !L) {
-                chrome['storage']['local']['set']({ 'user_credits': Math['max'](--K, 0x0) });
-                const N = await chrome['storage']['local']['get'](['email']), O = N['email'] || '', P = O ? '<br><br>Provide\x20this\x20CGI\x20portal\x20email\x20at\x20the\x20time\x20of\x20payment:\x20<b>' + O + '</b>' : '';
-                return Swal['fire']({
-                    'title': 'Support\x20the\x20Developer',
-                    'html': 'You\x27re\x20out\x20of\x20credits.<br>\x20Please\x20buy\x20unlimited\x20credits\x20for\x20just\x20<b>$15</b>' + P,
-                    'icon': 'warning',
-                    'showDenyButton': !![],
-                    'confirmButtonText': 'Contact\x20Developer',
-                    'confirmButtonColor': '#3F458E',
-                    'denyButtonText': 'Buy\x20Unlimited\x20Credits',
-                    'denyButtonColor': '#357856',
-                    'allowEscapeKey': ![],
-                    'allowEnterKey': ![],
-                    'allowOutsideClick': ![]
-                })['then'](async Q => {
-                    return window['open'](Q['isDenied'] ? 'https://buy.stripe.com/6oUbJ00Do1cp5JIaqAdwc08' : 'mailto:blsappointments.ca@gmail.com');
-                });
-            }
-            !L && (K--, chrome['storage']['local']['set']({ 'user_credits': Math['max'](K, 0x0) }));
             if (e !== a0w)
                 return;
             if (!a0u) {
@@ -1059,22 +884,6 @@ async function a0a1(a, b) {
         const l = await k['json'](), m = { ...l };
         m['Token'] && (m['Token'] = '[Token\x20length:\x20' + m['Token']['length'] + '\x20chars]');
         if (l['ScheduleDays'] && l['ScheduleDays']['length'] > 0x0) {
-            ((async () => {
-                try {
-                    const {scrapedVisaType: r} = await chrome['storage']['sync']['get']('scrapedVisaType'), s = r || 'UNKNOWN';
-                    await JWTAuth['makeAuthenticatedRequest']('https://ustraveldocscgiservertelegramalert-h3f2ercuf9d5f8gm.canadacentral-01.azurewebsites.net/api/datesVerified', {
-                        'method': 'POST',
-                        'body': JSON['stringify']({
-                            'dates': l['ScheduleDays'],
-                            'type': 'SCHEDULE',
-                            'postId': a['postId'],
-                            'location': a['cityName'] || 'Unknown',
-                            'visaType': s
-                        })
-                    });
-                } catch (t) {
-                }
-            })());
             const p = l['ScheduleDays']['sort']((r, s) => new Date(r['Date']) - new Date(s['Date']));
             if (p['length'] > 0x0) {
                 const r = p[0x0]['Date'];
@@ -1975,22 +1784,6 @@ async function a0ah(a, b) {
         const l = { ...k };
         l['Token'] && (l['Token'] = '[Token\x20length:\x20' + l['Token']['length'] + '\x20chars]');
         if (k['ScheduleDays'] && k['ScheduleDays']['length'] > 0x0) {
-            ((async () => {
-                try {
-                    const {scrapedVisaType: s} = await chrome['storage']['sync']['get']('scrapedVisaType'), t = s || 'UNKNOWN';
-                    await JWTAuth['makeAuthenticatedRequest']('https://ustraveldocscgiservertelegramalert-h3f2ercuf9d5f8gm.canadacentral-01.azurewebsites.net/api/datesVerified', {
-                        'method': 'POST',
-                        'body': JSON['stringify']({
-                            'dates': k['ScheduleDays'],
-                            'type': 'OFC',
-                            'postId': a['postId'],
-                            'location': a['cityName'] || 'Unknown',
-                            'visaType': t
-                        })
-                    });
-                } catch (u) {
-                }
-            })());
             const q = k['ScheduleDays']['sort']((s, t) => new Date(s['Date']) - new Date(t['Date']));
             if (q['length'] > 0x0) {
                 const s = q[0x0]['Date'];
