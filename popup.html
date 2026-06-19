@@ -63,8 +63,24 @@
                 </select>
             </div>
             <div class="form-group">
-                <label class="bold" for="frequencyValue">Value:</label>
-                <input class="form-control" type="number" id="frequencyValue" min="1" max="3600" value="30">
+                <label class="bold" for="frequencyStart">Start:</label>
+                <input class="form-control" type="number" id="frequencyStart" min="1" max="3600" value="30">
+            </div>
+            <div class="form-group">
+                <label class="bold" for="frequencyEnd">End:</label>
+                <input class="form-control" type="number" id="frequencyEnd" min="1" max="3600" value="60">
+            </div>
+        </div>
+        <small class="helper-text">Each next API call randomly uses one value inside this range.</small>
+        <h3>Recovery</h3>
+        <div class="popup-row auto-reload-row">
+            <div class="toggle-section auto-reload-toggle">
+                <input class="toggle-checkbox" type="checkbox" id="autoReloadEnabled">
+                <label for="autoReloadEnabled">Auto reload page</label>
+            </div>
+            <div class="form-group auto-reload-minutes">
+                <label class="bold" for="autoReloadMinutes">Every minutes:</label>
+                <input class="form-control" type="number" id="autoReloadMinutes" min="1" max="1440" value="15">
             </div>
         </div>
         <h3>Security Questions</h3>

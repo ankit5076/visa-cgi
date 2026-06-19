@@ -181,6 +181,20 @@ select:focus {
     text-align: left;
 }
 
+.auto-reload-row {
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.auto-reload-toggle {
+    min-height: 32px;
+}
+
+.auto-reload-minutes {
+    max-width: 180px;
+    margin-bottom: 0;
+}
+
 .question-answer-container {
     display: flex;
     align-items: flex-start;

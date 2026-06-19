@@ -97,9 +97,18 @@ let isBookingInProgress = false;
 let ofcTimerIntervalId = null;
 let ofcTimerDisplayElement = null;
 const OFC_TIMER_DURATION_MS = 2700000;
+const DEFAULT_FREQUENCY_START = 30;
+const DEFAULT_FREQUENCY_END = 60;
+const DEFAULT_FREQUENCY_TYPE = "seconds";
+const DEFAULT_AUTO_RELOAD_MINUTES = 15;
+const MAX_FREQUENCY_VALUE = 3600;
+const MAX_AUTO_RELOAD_MINUTES = 1440;
+const RATE_LIMIT_MIN_COOLDOWN_MS = 60000;
+const RATE_LIMIT_MAX_COOLDOWN_MS = 1800000;
 let trackedTimeouts = new Set();
 let trackedIntervals = new Set();
 let activeObservers = new Set();
+let autoReloadTimeoutId = null;
 async function schedulingJitteredApiFetch(a, b) {
   return VisaCgiUtility.fetchWithJitter(a, b, VisaCgiUtility.JITTER_RANGES.API);
 }
@@ -122,11 +131,267 @@ function scheduleTrackedInterval(a, b) {
   trackedIntervals.add(c);
   return c;
 }
+function normalizePositiveInteger(a, b, c, d) {
+  const e = Number.parseInt(a, 10);
+  if (!Number.isFinite(e)) {
+    return d;
+  }
+  return Math.min(Math.max(e, b), c);
+}
+function getFrequencyTypeMultiplier(a) {
+  if (a === "minutes") {
+    return 60000;
+  }
+  if (a === "hours") {
+    return 3600000;
+  }
+  return 1000;
+}
+function normalizeFrequencyType(a) {
+  return ["seconds", "minutes", "hours"].includes(a) ? a : DEFAULT_FREQUENCY_TYPE;
+}
+function normalizePollingRange(a) {
+  const b = normalizePositiveInteger(a.__fq, 1, MAX_FREQUENCY_VALUE, DEFAULT_FREQUENCY_START);
+  const c = normalizePositiveInteger(a.__fqStart ?? b, 1, MAX_FREQUENCY_VALUE, b);
+  const d = normalizePositiveInteger(a.__fqEnd ?? Math.min(b * 2, MAX_FREQUENCY_VALUE), 1, MAX_FREQUENCY_VALUE, DEFAULT_FREQUENCY_END);
+  const e = normalizeFrequencyType(a.__fqType);
+  const f = Math.max(c, d);
+  const g = getFrequencyTypeMultiplier(e);
+  return {
+    start: c,
+    end: f,
+    type: e,
+    startMs: c * g,
+    endMs: f * g
+  };
+}
+async function getPollingConfig() {
+  try {
+    const a = await chrome.storage.local.get(["__fq", "__fqStart", "__fqEnd", "__fqType"]);
+    const b = normalizePollingRange(a);
+    if (a.__fqStart !== b.start || a.__fqEnd !== b.end || a.__fq !== b.start || a.__fqType !== b.type) {
+      await chrome.storage.local.set({
+        __fq: b.start,
+        __fqStart: b.start,
+        __fqEnd: b.end,
+        __fqType: b.type
+      });
+    }
+    return b;
+  } catch (c) {
+    return normalizePollingRange({});
+  }
+}
+async function getPollingFrequencyMs() {
+  const a = await getPollingConfig();
+  return a.startMs;
+}
+async function getMaxPollingDelayMs() {
+  const a = await getPollingConfig();
+  return a.endMs;
+}
+async function getNextPollingDelayMs() {
+  const a = await getPollingConfig();
+  return VisaCgiUtility.randomDelayMs(a.startMs, a.endMs);
+}
+function getRemainingPollingDelayMs(a) {
+  if (!a || !a.selectedDelayMs || !a.startedAt) {
+    return 0;
+  }
+  return Math.max(a.selectedDelayMs - (Date.now() - a.startedAt), 1000);
+}
+function shufflePollingEntries(a) {
+  const b = [...a];
+  for (let c = b.length - 1; c > 0; c--) {
+    const d = Math.floor(Math.random() * (c + 1));
+    [b[c], b[d]] = [b[d], b[c]];
+  }
+  return b;
+}
+function parseRetryAfterMs(a) {
+  if (!a) {
+    return 0;
+  }
+  const b = Number(a);
+  if (Number.isFinite(b)) {
+    return Math.max(0, b * 1000);
+  }
+  const c = Date.parse(a);
+  if (Number.isFinite(c)) {
+    return Math.max(0, c - Date.now());
+  }
+  return 0;
+}
+async function createScheduleHttpError(a, b) {
+  const c = new Error("HTTP error! status: " + a.status);
+  c.status = a.status;
+  c.endpointType = b;
+  c.retryAfterMs = parseRetryAfterMs(a.headers?.get?.("retry-after"));
+  try {
+    const d = await a.clone().text();
+    if (d) {
+      c.responseText = d.slice(0, 2000);
+      try {
+        const e = JSON.parse(d);
+        c.responseJson = e;
+        const f = e.retry_after ?? e.retryAfter ?? e.retry_after_seconds ?? e.retryAfterSeconds;
+        const g = e.retry_after_ms ?? e.retryAfterMs;
+        if (Number.isFinite(Number(g))) {
+          c.retryAfterMs = Math.max(c.retryAfterMs || 0, Number(g));
+        } else if (Number.isFinite(Number(f))) {
+          c.retryAfterMs = Math.max(c.retryAfterMs || 0, Number(f) * 1000);
+        }
+      } catch (e) {}
+    }
+  } catch (d) {}
+  return c;
+}
+async function throwIfScheduleResponseFailed(a, b) {
+  if (!a.ok) {
+    throw await createScheduleHttpError(a, b);
+  }
+}
+function isRateLimitError(a) {
+  const b = String(a?.message || "").toLowerCase();
+  return a?.status === 429 || b.includes("429") || b.includes("rate limit") || b.includes("too many requests");
+}
+async function getRemainingRateLimitCooldownMs() {
+  try {
+    const {
+      __rateLimitCooldownUntil: a
+    } = await chrome.storage.local.get("__rateLimitCooldownUntil");
+    return Math.max(0, Number(a || 0) - Date.now());
+  } catch (b) {
+    return 0;
+  }
+}
+async function clearRateLimitCooldown() {
+  try {
+    await chrome.storage.local.remove([
+      "__rateLimitCooldownUntil",
+      "__rateLimitBackoffLevel"
+    ]);
+  } catch (a) {}
+}
+function buildRateLimitCooldownToast(a) {
+  return "\n    <div class=\"gsn-toast-card\">\n      <div class=\"gsn-toast-inner\">\n        <div class=\"gsn-toast-header\">\n          <span class=\"gsn-toast-dot\" aria-hidden=\"true\"></span>\n          <span class=\"gsn-toast-title\">Rate limit cooldown</span>\n        </div>\n        <div class=\"gsn-toast-grid\">\n          <div class=\"gsn-toast-row\"><span class=\"gsn-toast-label\">Endpoint</span><span class=\"gsn-toast-value is-primary\">" + escapeSchedulerToastHtml(a.endpointType || "Schedule days") + "</span></div>\n          <div class=\"gsn-toast-row\"><span class=\"gsn-toast-label\">Location</span><span class=\"gsn-toast-value\">" + escapeSchedulerToastHtml(a.cityName || "Unknown") + "</span></div>\n        </div>\n        <div class=\"gsn-toast-status\">Paused after 429. The bot will resume automatically.</div>\n        <div class=\"gsn-toast-countdown\" data-gsn-countdown data-gsn-countdown-label=\"Resume\" aria-live=\"polite\" aria-label=\"Resume in " + escapeSchedulerToastHtml(formatSchedulerCountdown(a.cooldownMs)) + "\">\n          <div class=\"gsn-toast-countdown-head\">\n            <span class=\"gsn-toast-countdown-label-wrap\"><span class=\"gsn-toast-loader\" aria-hidden=\"true\"></span><span class=\"gsn-toast-countdown-label\">Resume</span></span>\n            <strong class=\"gsn-toast-countdown-time\" data-gsn-countdown-text>" + escapeSchedulerToastHtml(formatSchedulerCountdown(a.cooldownMs)) + "</strong>\n          </div>\n          <div class=\"gsn-toast-countdown-track\" aria-hidden=\"true\"><span class=\"gsn-toast-countdown-bar\" data-gsn-countdown-bar></span></div>\n        </div>\n        <div class=\"gsn-toast-footer\"><span>Retry hint <strong>" + escapeSchedulerToastHtml(formatSchedulerCountdown(a.retryAfterMs || 0)) + "</strong></span><span>Checked <strong>" + escapeSchedulerToastHtml(formatSchedulerCheckedAt()) + "</strong></span></div>\n      </div>\n    </div>\n  ";
+}
+async function enterRateLimitCooldown(a) {
+  const b = Math.max(0, Number(a.error?.retryAfterMs || 0));
+  const c = await getMaxPollingDelayMs();
+  let d = 0;
+  try {
+    const {
+      __rateLimitBackoffLevel: j = 0
+    } = await chrome.storage.local.get("__rateLimitBackoffLevel");
+    d = normalizePositiveInteger(j, 0, 10, 0);
+  } catch (j) {}
+  const e = Math.min(d + 1, 10);
+  const f = Math.min(RATE_LIMIT_MIN_COOLDOWN_MS * Math.pow(2, e - 1), RATE_LIMIT_MAX_COOLDOWN_MS);
+  const g = Math.min(Math.max(b, c, RATE_LIMIT_MIN_COOLDOWN_MS, f), RATE_LIMIT_MAX_COOLDOWN_MS);
+  const h = Date.now();
+  const i = h + g;
+  await chrome.storage.local.set({
+    __rateLimitCooldownUntil: i,
+    __rateLimitBackoffLevel: e,
+    __rateLimitLastEvent: {
+      endpointType: a.endpointType || "Schedule days",
+      cityName: a.cityName || "Unknown",
+      cooldownMs: g,
+      retryAfterMs: b,
+      timestampMs: h,
+      timestampIst: formatSchedulerCheckedAt(new Date(h))
+    }
+  });
+  await logSchedulerMessage("Rate limit cooldown - Endpoint: " + (a.endpointType || "Schedule days") + " - Location: " + (a.cityName || "Unknown") + " - Cooldown: " + formatSchedulerCountdown(g) + " - Retry hint: " + formatSchedulerCountdown(b) + " - Backoff level: " + e);
+  await showSchedulerToast(buildRateLimitCooldownToast({
+    endpointType: a.endpointType,
+    cityName: a.cityName,
+    cooldownMs: g,
+    retryAfterMs: b
+  }), {
+    timerMs: g,
+    countdownMs: g,
+    customClass: "gsn-scheduler-toast",
+    skipCurrentAppointment: true,
+    themed: true
+  });
+  return g;
+}
+async function getAutoReloadConfig() {
+  try {
+    const a = await chrome.storage.local.get(["__autoReloadEnabled", "__autoReloadMinutes"]);
+    const b = a.__autoReloadEnabled !== false;
+    const c = normalizePositiveInteger(a.__autoReloadMinutes, 1, MAX_AUTO_RELOAD_MINUTES, DEFAULT_AUTO_RELOAD_MINUTES);
+    if (a.__autoReloadEnabled === undefined || a.__autoReloadMinutes === undefined) {
+      await chrome.storage.local.set({
+        __autoReloadEnabled: b,
+        __autoReloadMinutes: c
+      });
+    }
+    return {
+      enabled: b,
+      minutes: c,
+      delayMs: c * 60000
+    };
+  } catch (d) {
+    return {
+      enabled: true,
+      minutes: DEFAULT_AUTO_RELOAD_MINUTES,
+      delayMs: DEFAULT_AUTO_RELOAD_MINUTES * 60000
+    };
+  }
+}
+function isSchedulingAutomationPage() {
+  const a = window.location.hostname.includes("usvisascheduling.com");
+  const b = window.location.pathname.includes("/schedule");
+  return a && b && !window.location.pathname.includes("/appointment-confirmation");
+}
+async function shouldDelayAutoReload() {
+  try {
+    const {
+      dateSelectionInProgress: a,
+      bookingInProgress: b
+    } = await chrome.storage.local.get(["dateSelectionInProgress", "bookingInProgress"]);
+    return Boolean(a || b || isSelectingPreferredDate || isBookingInProgress);
+  } catch (c) {
+    return Boolean(isSelectingPreferredDate || isBookingInProgress);
+  }
+}
+function clearAutoReloadTimer() {
+  if (autoReloadTimeoutId) {
+    clearTimeout(autoReloadTimeoutId);
+    trackedTimeouts.delete(autoReloadTimeoutId);
+    autoReloadTimeoutId = null;
+  }
+}
+async function handleAutoReloadTimer() {
+  autoReloadTimeoutId = null;
+  const a = await getAutoReloadConfig();
+  if (!a.enabled || !isSchedulerActive || !isSchedulingAutomationPage()) {
+    return;
+  }
+  if (await shouldDelayAutoReload()) {
+    autoReloadTimeoutId = scheduleTrackedTimeout(handleAutoReloadTimer, 60000);
+    return;
+  }
+  await logSchedulerMessage("Auto reload triggered after " + a.minutes + " minutes");
+  window.location.reload();
+}
+async function scheduleAutoReloadTimer() {
+  clearAutoReloadTimer();
+  const a = await getAutoReloadConfig();
+  if (!a.enabled || !isSchedulerActive || !isSchedulingAutomationPage()) {
+    return;
+  }
+  autoReloadTimeoutId = scheduleTrackedTimeout(handleAutoReloadTimer, a.delayMs);
+}
 function cleanupSchedulerState() {
   trackedTimeouts.forEach(a => clearTimeout(a));
   trackedTimeouts.clear();
   trackedIntervals.forEach(a => clearInterval(a));
   trackedIntervals.clear();
+  autoReloadTimeoutId = null;
   activeObservers.forEach(a => {
     try {
       a.disconnect();
@@ -335,6 +600,7 @@ if (!window.schedulingPageInitialized) {
   window.schedulingPageInitialized = true;
   document.addEventListener("DOMContentLoaded", async () => {
     await loadSchedulerActiveState();
+    await scheduleAutoReloadTimer();
     if (window.location.href.match(/usvisascheduling\.com\/en-US\/?$/)) {
       setTimeout(async () => {
         await cacheAuthenticatedUserEmail();
@@ -356,9 +622,19 @@ if (!window.schedulingPageInitialized) {
       await restoreOfcTimerDisplayIfNeeded();
     }, 2000);
   });
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && (
+      changes.__autoReloadEnabled ||
+      changes.__autoReloadMinutes ||
+      changes.__ap
+    )) {
+      scheduleAutoReloadTimer();
+    }
+  });
 }
 async function runSchedulerPageAutomation() {
   const a = await resumePendingDateSelectionIfNeeded();
+  await scheduleAutoReloadTimer();
   if (window.location.href.includes("/appointment-confirmation/")) {
     await chrome.storage.local.set({
       dateSelectionInProgress: false,
@@ -961,6 +1237,7 @@ async function startDatePolling(a, b) {
       }
       return;
     }
+    let pollingEntries = shufflePollingEntries(g);
     currentCityIndex = 0;
     async function m() {
       if (e !== pollingRunId) {
@@ -977,33 +1254,46 @@ async function startDatePolling(a, b) {
       }
       const M = Date.now();
       try {
-        if (!g || g.length === 0) {
+        const cooldownMs = await getRemainingRateLimitCooldownMs();
+        if (cooldownMs > 0) {
+          scheduleTrackedTimeout(m, cooldownMs);
+          return;
+        }
+        if (!pollingEntries || pollingEntries.length === 0) {
           if (e === pollingRunId) {
             isDatePollingActive = false;
           }
           return;
         }
-        const [Q, R] = g[currentCityIndex];
+        if (currentCityIndex >= pollingEntries.length) {
+          pollingEntries = shufflePollingEntries(g);
+          currentCityIndex = 0;
+        }
+        const [Q, R] = pollingEntries[currentCityIndex];
         const S = {
           ...a,
           postId: Q,
           cityName: R
         };
+        const U = await getNextPollingDelayMs();
+        const V = {
+          selectedDelayMs: U,
+          startedAt: M
+        };
         const T = window.location.pathname;
         if (T.includes("/ofc-schedule")) {
-          checkOfcScheduleDays(S, b).catch(X => {});
+          await checkOfcScheduleDays(S, b, V);
         } else {
-          checkConsularScheduleDays(S, b).catch(X => {});
+          await checkConsularScheduleDays(S, b, V);
         }
-        currentCityIndex = (currentCityIndex + 1) % g.length;
-        const U = await getPollingFrequencyMs();
-        const V = Date.now() - M;
-        const W = Math.max(U - V, 1000);
-        scheduleTrackedTimeout(m, W);
+        currentCityIndex++;
+        const W = await getRemainingRateLimitCooldownMs();
+        const X = W > 0 ? W : getRemainingPollingDelayMs(V);
+        scheduleTrackedTimeout(m, X);
       } catch (X) {
         if (isSchedulerActive && isDatePollingActive && e === pollingRunId) {
-          const Y = await getPollingFrequencyMs();
-          scheduleTrackedTimeout(m, Y);
+          const Y = isRateLimitError(X) ? await getRemainingRateLimitCooldownMs() : await getNextPollingDelayMs();
+          scheduleTrackedTimeout(m, Math.max(Y, 1000));
         }
       }
     }
@@ -1014,7 +1304,7 @@ async function startDatePolling(a, b) {
     }
   }
 }
-async function checkConsularScheduleDays(a, b) {
+async function checkConsularScheduleDays(a, b, pollingPlan = null) {
   try {
     const c = await getOfcTimerState();
     if (c.expired) {
@@ -1062,10 +1352,9 @@ async function checkConsularScheduleDays(a, b) {
       },
       body: g
     });
-    if (!k.ok) {
-      throw new Error("HTTP error! status: " + k.status);
-    }
+    await throwIfScheduleResponseFailed(k, "Consular schedule days");
     const l = await k.json();
+    await clearRateLimitCooldown();
     const m = {
       ...l
     };
@@ -1227,7 +1516,8 @@ async function checkConsularScheduleDays(a, b) {
           earliestAvailability: a8,
           preferredRange: formatDateRange(d.startDate, d.endDate),
           status: "No dates found within preferred range",
-          checkedAt: formatSchedulerCheckedAt()
+          checkedAt: formatSchedulerCheckedAt(),
+          nextCallMs: getRemainingPollingDelayMs(pollingPlan)
         });
       }
     } else {
@@ -1238,25 +1528,18 @@ async function checkConsularScheduleDays(a, b) {
         location: a.cityName || "Unknown",
         preferredRange: formatDateRange(d.startDate, d.endDate),
         status: "No available dates found",
-        checkedAt: formatSchedulerCheckedAt()
+        checkedAt: formatSchedulerCheckedAt(),
+        nextCallMs: getRemainingPollingDelayMs(pollingPlan)
       });
     }
   } catch (ag) {
     await logSchedulerMessage(" - Location: " + (a.cityName || "Unknown") + " - Error: " + ag.message);
-    if (ag.message && (ag.message.includes("429") || ag.message.includes("rate limit") || ag.message.includes("too many requests"))) {
-      await Swal.fire({
-        title: "🚦 Consulate sent Error 429",
-        html: "\n                    <div style=\"text-align: center; padding: 20px;\">\n                        <h3 style=\"color: #ff6b35; margin-bottom: 20px;\">⚠️ Server Rate Limit Detected</h3>\n                        <p style=\"margin-bottom: 15px;\">The server is receiving too many requests and has temporarily blocked further requests.</p>\n                        <p style=\"margin-bottom: 15px;\"><strong>Please turn off the bot for a few hours</strong> to allow the rate limit to reset.</p>\n                        <p style=\"color: #666; font-size: 14px; margin-bottom: 20px;\">This helps prevent your account from being temporarily suspended.</p>\n                        <div style=\"background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;\">\n                            <p style=\"margin: 0; color: #495057;\"><strong>💡 Recommended Action:</strong></p>\n                            <p style=\"margin: 5px 0 0 0; color: #495057;\">Wait 2-4 hours before reactivating the bot</p>\n                        </div>\n                    </div>\n                ",
-        icon: "warning",
-        confirmButtonText: "I'll Turn Off the Bot",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        customClass: {
-          popup: "swal-wide"
-        }
+    if (isRateLimitError(ag)) {
+      await enterRateLimitCooldown({
+        error: ag,
+        endpointType: "Consular schedule days",
+        cityName: a.cityName || "Unknown"
       });
-      isDatePollingActive = false;
-      cleanupSchedulerState();
       return;
     }
     const ah = await getCachedUserSettings();
@@ -1323,30 +1606,6 @@ async function fetchConsularTimeSlots(a, b, c) {
     return null;
   }
 }
-async function getPollingFrequencyMs() {
-  try {
-    const a = await new Promise(b => {
-      chrome.storage.local.get(["__fq", "__fqType"], c => {
-        let d = c.__fq || 30;
-        let e = c.__fqType || "seconds";
-        let f = 30000;
-        if (d) {
-          if (e === "seconds") {
-            f = d * 1000;
-          } else if (e === "minutes") {
-            f = d * 60 * 1000;
-          } else if (e === "hours") {
-            f = d * 60 * 60 * 1000;
-          }
-        }
-        b(f);
-      });
-    });
-    return a;
-  } catch (b) {
-    return 30000;
-  }
-}
 async function getCurrentAppointment() {
   try {
     const {
@@ -1403,6 +1662,7 @@ function attachSchedulerCountdown(a, b) {
   }
   const d = c.querySelector("[data-gsn-countdown-text]");
   const e = c.querySelector("[data-gsn-countdown-bar]");
+  const label = c.getAttribute("data-gsn-countdown-label") || "Next call";
   const f = Date.now();
   const g = () => {
     const h = Math.max(0, b - (Date.now() - f));
@@ -1413,7 +1673,7 @@ function attachSchedulerCountdown(a, b) {
     if (e) {
       e.style.transform = "scaleX(" + Math.max(0, Math.min(1, h / b)) + ")";
     }
-    c.setAttribute("aria-label", "Next call in " + i);
+    c.setAttribute("aria-label", label + " in " + i);
   };
   g();
   return setInterval(g, 1000);
@@ -1490,7 +1750,7 @@ const showSchedulerToast = async (a, options = {}) => {
 };
 const showDateAvailabilityToast = async a => {
   const b = await getCurrentAppointment();
-  const c = await getPollingFrequencyMs();
+  const c = Number(a.nextCallMs || 0) > 0 ? Number(a.nextCallMs) : await getNextPollingDelayMs();
   await showSchedulerToast(buildDateAvailabilityToast({
     ...a,
     currentAppointment: b?.dateString || "",
@@ -2261,14 +2521,14 @@ async function startPollingForContext(a, b) {
     await startDatePolling(a, b);
   } catch (d) {
     if (isSchedulerActive) {
-      const e = await getPollingFrequencyMs();
+      const e = await getNextPollingDelayMs();
       setTimeout(() => startPollingForContext(a, b), e);
     }
   } finally {
     isPollingStartInProgress = false;
   }
 }
-async function checkOfcScheduleDays(a, b) {
+async function checkOfcScheduleDays(a, b, pollingPlan = null) {
   if (!isSchedulerActive) {
     return;
   }
@@ -2314,9 +2574,7 @@ async function checkOfcScheduleDays(a, b) {
       body: f.toString(),
       credentials: "include"
     });
-    if (!j.ok) {
-      throw new Error("HTTP error! status: " + j.status);
-    }
+    await throwIfScheduleResponseFailed(j, "OFC schedule days");
     let k;
     try {
       const o = await j.text();
@@ -2329,6 +2587,7 @@ async function checkOfcScheduleDays(a, b) {
       }, 3500);
       throw new Error("Invalid JSON response: " + p.message);
     }
+    await clearRateLimitCooldown();
     const l = {
       ...k
     };
@@ -2482,7 +2741,8 @@ async function checkOfcScheduleDays(a, b) {
           earliestAvailability: ae,
           preferredRange: formatDateRange(c.startDate, c.endDate),
           status: "No dates found within preferred range",
-          checkedAt: formatSchedulerCheckedAt()
+          checkedAt: formatSchedulerCheckedAt(),
+          nextCallMs: getRemainingPollingDelayMs(pollingPlan)
         });
       }
     } else {
@@ -2493,25 +2753,18 @@ async function checkOfcScheduleDays(a, b) {
         location: a.cityName || "Unknown",
         preferredRange: formatDateRange(c.startDate, c.endDate),
         status: "No OFC dates available",
-        checkedAt: formatSchedulerCheckedAt()
+        checkedAt: formatSchedulerCheckedAt(),
+        nextCallMs: getRemainingPollingDelayMs(pollingPlan)
       });
     }
   } catch (am) {
     await logSchedulerMessage("OFC  - City: " + (a.cityName || "Unknown") + " - Error: " + am.message);
-    if (am.message && (am.message.includes("429") || am.message.includes("rate limit") || am.message.includes("too many requests"))) {
-      await Swal.fire({
-        title: "🚦 Consulate sent Error 429",
-        html: "\n                    <div style=\"text-align: center; padding: 20px;\">\n                        <h3 style=\"color: #ff6b35; margin-bottom: 20px;\">⚠️ Server Rate Limit Detected</h3>\n                        <p style=\"margin-bottom: 15px;\">The server is receiving too many requests and has temporarily blocked further requests.</p>\n                        <p style=\"margin-bottom: 15px;\"><strong>Please turn off the bot for a few hours</strong> to allow the rate limit to reset.</p>\n                        <p style=\"color: #666; font-size: 14px; margin-bottom: 20px;\">This helps prevent your account from being temporarily suspended.</p>\n                        <div style=\"background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;\">\n                            <p style=\"margin: 0; color: #495057;\"><strong>💡 Recommended Action:</strong></p>\n                            <p style=\"margin: 5px 0 0 0; color: #495057;\">Wait 2-4 hours before reactivating the bot</p>\n                        </div>\n                    </div>\n                ",
-        icon: "warning",
-        confirmButtonText: "I'll Turn Off the Bot",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        customClass: {
-          popup: "swal-wide"
-        }
+    if (isRateLimitError(am)) {
+      await enterRateLimitCooldown({
+        error: am,
+        endpointType: "OFC schedule days",
+        cityName: a.cityName || "Unknown"
       });
-      isDatePollingActive = false;
-      cleanupSchedulerState();
       return;
     }
     let an = "Unknown";
@@ -2700,6 +2953,7 @@ schedulerPort.onMessage.addListener(async function (a) {
     let c = a.status;
     isSchedulerActive = c;
     if (c) {
+      await scheduleAutoReloadTimer();
       runSchedulerPageAutomation();
     } else {
       stopSchedulerAutomation();

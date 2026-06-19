@@ -1,4 +1,73 @@
 document.addEventListener('DOMContentLoaded', async () => {
+  const DEFAULT_FREQUENCY_START = 30;
+  const DEFAULT_FREQUENCY_END = 60;
+  const DEFAULT_AUTO_RELOAD_MINUTES = 15;
+  const MAX_FREQUENCY_VALUE = 3600;
+  const MAX_AUTO_RELOAD_MINUTES = 1440;
+
+  function clampNumber(value, min, max, fallback) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.min(Math.max(parsed, min), max);
+  }
+
+  function normalizeFrequencyRange(startValue, endValue) {
+    const start = clampNumber(startValue, 1, MAX_FREQUENCY_VALUE, DEFAULT_FREQUENCY_START);
+    const end = clampNumber(endValue, 1, MAX_FREQUENCY_VALUE, Math.min(start * 2, MAX_FREQUENCY_VALUE));
+    return {
+      start,
+      end: Math.max(start, end)
+    };
+  }
+
+  function normalizeFrequencyType(value) {
+    return ["seconds", "minutes", "hours"].includes(value) ? value : "seconds";
+  }
+
+  function getFrequencyFormValues() {
+    return normalizeFrequencyRange(
+      document.getElementById("frequencyStart").value,
+      document.getElementById("frequencyEnd").value
+    );
+  }
+
+  function applyFrequencyFormValues(range) {
+    document.getElementById("frequencyStart").value = range.start;
+    document.getElementById("frequencyEnd").value = range.end;
+  }
+
+  function getAutoReloadMinutes() {
+    return clampNumber(
+      document.getElementById("autoReloadMinutes").value,
+      1,
+      MAX_AUTO_RELOAD_MINUTES,
+      DEFAULT_AUTO_RELOAD_MINUTES
+    );
+  }
+
+  function saveFrequencySettings(callback) {
+    const range = getFrequencyFormValues();
+    applyFrequencyFormValues(range);
+    const frequencyType = normalizeFrequencyType(document.getElementById("frequencyType").value);
+    chrome.storage.local.set({
+      __fq: range.start,
+      __fqStart: range.start,
+      __fqEnd: range.end,
+      __fqType: frequencyType
+    }, callback);
+  }
+
+  function saveAutoReloadSettings(callback) {
+    const minutes = getAutoReloadMinutes();
+    document.getElementById("autoReloadMinutes").value = minutes;
+    chrome.storage.local.set({
+      __autoReloadEnabled: document.getElementById("autoReloadEnabled").checked,
+      __autoReloadMinutes: minutes
+    }, callback);
+  }
+
   const versionElement = document.getElementById('version');
   if (versionElement) {
     const manifest = chrome.runtime.getManifest();
@@ -49,16 +118,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('answer1').value = data.answer1 || '';
     document.getElementById('answer2').value = data.answer2 || '';
     document.getElementById('answer3').value = data.answer3 || '';
-    chrome.storage.local.get(['__fq', '__fqType'], function(items) {
-      document.getElementById("frequencyValue").value = items.__fq || 30;
+    chrome.storage.local.get([
+      '__fq',
+      '__fqStart',
+      '__fqEnd',
+      '__fqType',
+      '__autoReloadEnabled',
+      '__autoReloadMinutes'
+    ], function(items) {
+      const legacyFrequency = clampNumber(items.__fq, 1, MAX_FREQUENCY_VALUE, DEFAULT_FREQUENCY_START);
+      const migratedRange = normalizeFrequencyRange(
+        items.__fqStart ?? legacyFrequency,
+        items.__fqEnd ?? Math.min(legacyFrequency * 2, MAX_FREQUENCY_VALUE)
+      );
+      applyFrequencyFormValues(migratedRange);
       let frequencyTypeSelect = document.getElementById("frequencyType");
-      let frequencyType = items.__fqType || "seconds";
+      let frequencyType = normalizeFrequencyType(items.__fqType);
       for (let i = 0; i < frequencyTypeSelect.options.length; i++) {
         if (frequencyTypeSelect.options[i].value === frequencyType) {
           frequencyTypeSelect.selectedIndex = i;
           break;
         }
       }
+      document.getElementById("autoReloadEnabled").checked = items.__autoReloadEnabled !== false;
+      document.getElementById("autoReloadMinutes").value = clampNumber(
+        items.__autoReloadMinutes,
+        1,
+        MAX_AUTO_RELOAD_MINUTES,
+        DEFAULT_AUTO_RELOAD_MINUTES
+      );
+      chrome.storage.local.set({
+        __fq: migratedRange.start,
+        __fqStart: migratedRange.start,
+        __fqEnd: migratedRange.end,
+        __fqType: frequencyType,
+        __autoReloadEnabled: items.__autoReloadEnabled !== false,
+        __autoReloadMinutes: clampNumber(items.__autoReloadMinutes, 1, MAX_AUTO_RELOAD_MINUTES, DEFAULT_AUTO_RELOAD_MINUTES)
+      });
     });
   });
   await setupCityGrids();
@@ -142,25 +238,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       credentials.captchaApiKeyPreference = 'use';
     }
     chrome.storage.sync.set(credentials, () => {
-      const frequencyValue = parseInt(document.getElementById("frequencyValue").value) || 30;
-      const frequencyType = document.getElementById("frequencyType").value || "seconds";
-      chrome.storage.local.set({ 
-        __fq: frequencyValue,
-        __fqType: frequencyType
-      }, () => {
-        showNotification('Saved');
+      saveFrequencySettings(() => {
+        saveAutoReloadSettings(() => {
+          showNotification('Saved');
+        });
       });
       //window.close();
     });
   });
-  document.getElementById("frequencyValue").addEventListener("change", function() {
-    const value = parseInt(this.value) || 30;
-    if (value < 1) this.value = 1;
-    if (value > 3600) this.value = 3600;
-    chrome.storage.local.set({ __fq: parseInt(this.value) });
+  document.getElementById("frequencyStart").addEventListener("change", function() {
+    saveFrequencySettings();
+  });
+  document.getElementById("frequencyEnd").addEventListener("change", function() {
+    saveFrequencySettings();
   });
   document.getElementById("frequencyType").addEventListener("change", function() {
-    chrome.storage.local.set({ __fqType: this.value });
+    saveFrequencySettings();
+  });
+  document.getElementById("autoReloadEnabled").addEventListener("change", function() {
+    saveAutoReloadSettings();
+  });
+  document.getElementById("autoReloadMinutes").addEventListener("change", function() {
+    saveAutoReloadSettings();
   });
 });
 async function setupCityGrids() {
